@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
@@ -362,6 +361,18 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
         setEditingPromotion(null);
     };
 
+    // FIX: Moved settings handlers out of render logic to prevent potential stale closures and improve performance.
+    const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setLocalSettings(prev => ({ ...prev, [name]: value }));
+    };
+    
+    const handleSettingsSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        props.setSettings(localSettings);
+        alert('Configuración guardada!');
+    };
+
     // Drag and Drop Handlers
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, appointment: Appointment) => {
         setDraggedItem(appointment);
@@ -579,17 +590,6 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                     onOpenClinicalRecord={props.onOpenClinicalRecord}
                 />;
             case 'settings': {
-                const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-                    const { name, value } = e.target;
-                    setLocalSettings(prev => ({ ...prev, [name]: value }));
-                };
-                
-                const handleSettingsSave = (e: React.FormEvent) => {
-                    e.preventDefault();
-                    props.setSettings(localSettings);
-                    alert('Configuración guardada!');
-                };
-
                 return (
                     <div>
                         <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Configuración</h2>
