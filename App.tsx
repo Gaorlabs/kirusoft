@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { AdminPage } from './components/AdminPage';
@@ -80,6 +80,31 @@ const MOCK_PATIENT_RECORDS: Record<string, PatientRecord> = {
     }
 };
 
+// Custom hook for persisting state to localStorage
+function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const stickyValue = window.localStorage.getItem(key);
+      if (stickyValue !== null) {
+        return JSON.parse(stickyValue);
+      }
+    } catch (error) {
+      console.error(`Error parsing localStorage key "${key}":`, error);
+    }
+    return defaultValue;
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error setting localStorage key "${key}":`, error);
+    }
+  }, [key, value]);
+
+  return [value, setValue];
+}
+
 type Page = 'landing' | 'login' | 'admin' | 'consultation';
 type MainView = 'odontogram' | 'plan' | 'history' | 'prescriptions' | 'consents' | 'accounts';
 
@@ -87,11 +112,13 @@ type MainView = 'odontogram' | 'plan' | 'history' | 'prescriptions' | 'consents'
 function App() {
     const [page, setPage] = useState<Page>('landing');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [appointments, setAppointments] = useState<Appointment[]>(MOCK_APPOINTMENTS);
-    const [doctors, setDoctors] = useState<Doctor[]>(MOCK_DOCTORS);
-    const [promotions, setPromotions] = useState<Promotion[]>(MOCK_PROMOTIONS);
-    const [settings, setSettings] = useState<AppSettings>(MOCK_SETTINGS);
-    const [patientRecords, setPatientRecords] = useState<Record<string, PatientRecord>>(MOCK_PATIENT_RECORDS);
+    
+    // Use sticky state to persist data across reloads
+    const [appointments, setAppointments] = useStickyState<Appointment[]>(MOCK_APPOINTMENTS, 'kiru-appointments');
+    const [doctors, setDoctors] = useStickyState<Doctor[]>(MOCK_DOCTORS, 'kiru-doctors');
+    const [promotions, setPromotions] = useStickyState<Promotion[]>(MOCK_PROMOTIONS, 'kiru-promotions');
+    const [settings, setSettings] = useStickyState<AppSettings>(MOCK_SETTINGS, 'kiru-settings');
+    const [patientRecords, setPatientRecords] = useStickyState<Record<string, PatientRecord>>(MOCK_PATIENT_RECORDS, 'kiru-patientRecords');
     
     const [currentPatientIndex, setCurrentPatientIndex] = useState<number | null>(null);
     const [initialTabForConsultation, setInitialTabForConsultation] = useState<MainView | undefined>();

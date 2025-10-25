@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
@@ -95,7 +96,8 @@ const AdminAccountsView: React.FC<{
             const summary = summaries[record.patientId];
             if (summary) {
                 const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
-                const paid = (record.payments || []).reduce((sum, p) => sum + p.amount, 0);
+                // FIX: Explicitly cast payment amount to Number to prevent arithmetic errors.
+                const paid = (record.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
                 
                 summary.totalBilled = billed;
                 summary.totalPaid = paid;
@@ -177,7 +179,8 @@ const AdminDashboardView: React.FC<{
                 });
             });
             (record.payments || []).forEach(payment => {
-                revenue += payment.amount;
+                // FIX: Explicitly cast payment amount to Number to prevent arithmetic errors.
+                revenue += Number(payment.amount);
             });
         });
 
@@ -204,7 +207,8 @@ const AdminDashboardView: React.FC<{
             (record.payments || []).forEach(payment => {
                 const paymentDay = new Date(payment.date).toDateString();
                 if (dailyTotals[paymentDay] !== undefined) {
-                    dailyTotals[paymentDay] += payment.amount;
+                    // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type. Cast to Number.
+                    dailyTotals[paymentDay] += Number(payment.amount);
                 }
             });
         });
