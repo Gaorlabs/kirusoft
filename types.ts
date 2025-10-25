@@ -81,6 +81,17 @@ export interface AppSettings {
     clinicEmail: string;
     heroImageUrl: string;
     loginImageUrl: string;
+    yapeInfo: {
+        qrUrl: string;
+        recipientName: string;
+        phoneNumber: string;
+    };
+    plinInfo: {
+        qrUrl: string;
+        recipientName: string;
+        phoneNumber: string;
+    };
+    whatsappNumber: string;
 }
 
 export interface Prescription {

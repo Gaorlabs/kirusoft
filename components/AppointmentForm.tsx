@@ -17,7 +17,7 @@ const generateTimeSlots = (doctors: Doctor[]) => {
     const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     let currentDate = new Date();
     
-    for (let i = 0; i < 7; i++) { // Generate for the next 7 days
+    for (let i = 0; i < 10; i++) { // Generate for the next 10 days
         const dayDate = new Date(currentDate);
         dayDate.setDate(currentDate.getDate() + i);
         dayDate.setHours(0, 0, 0, 0);
@@ -150,7 +150,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                     
                     <div>
                         <h3 className="text-lg font-semibold text-blue-600 mb-4">2. Elige un Día</h3>
-                         <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
+                         <div className="flex space-x-2 overflow-x-auto pb-4">
                             {timeSlotsByDay.map(({ date, hasSlots }) => {
                                 const isSelected = selectedDate?.toDateString() === date.toDateString();
                                 return (
@@ -164,7 +164,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                                             }
                                         }}
                                         disabled={!hasSlots}
-                                        className={`p-3 rounded-lg text-center transition-all duration-300 transform ${
+                                        className={`p-3 rounded-lg text-center transition-all duration-300 transform flex-shrink-0 w-28 ${
                                             isSelected
                                             ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-300 -translate-y-1'
                                             : hasSlots
@@ -217,7 +217,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                         disabled={!selectedSlot || !name || !email || !phone || !service}
                         className="w-full bg-pink-600 text-white px-8 py-3 rounded-lg hover:bg-pink-700 font-semibold shadow-lg disabled:bg-slate-400 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:scale-100 text-base"
                     >
-                        Confirmar Cita
+                        Continuar con el Pago
                     </button>
                 </div>
             </div>

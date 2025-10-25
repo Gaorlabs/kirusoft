@@ -110,6 +110,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onBookAppointment, set
     }
   }, [activePromotion]);
 
+  const handleAppointmentFormSubmit = (appointmentData: Omit<Appointment, 'id' | 'status'>) => {
+      onBookAppointment(appointmentData);
+      setIsModalOpen(false);
+  };
+
   return (
     <div className="bg-slate-50 text-slate-800 font-sans">
       <header className="absolute top-0 left-0 right-0 z-50 p-4">
@@ -245,11 +250,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onBookAppointment, set
                  <h2 className="text-3xl font-bold mb-4">Contáctanos</h2>
                  <p className="text-slate-300 mb-8 max-w-xl mx-auto">¿Listo para transformar tu sonrisa? Agenda una cita o contáctanos para más información.</p>
                  <div className="flex flex-col md:flex-row justify-center items-center gap-8 mb-8 text-slate-200">
-                    <span>Email: <a href="mailto:info@kiru.com" className="hover:text-pink-400">info@kiru.com</a></span>
-                    <span>Teléfono: <a href="tel:+5112345678" className="hover:text-pink-400">(+51) 123 456 78</a></span>
-                    <span>Dirección: Av. Sonrisas 123, Lima, Perú</span>
+                    <span>Email: <a href="mailto:info@kiru.com" className="hover:text-pink-400">{settings.clinicEmail}</a></span>
+                    <span>Teléfono: <a href={`tel:${settings.clinicPhone}`} className="hover:text-pink-400">{settings.clinicPhone}</a></span>
+                    <span>Dirección: {settings.clinicAddress}</span>
                  </div>
-                <p className="text-slate-400 mt-8">&copy; {new Date().getFullYear()} Clínica Dental Kiru. Todos los derechos reservados.</p>
+                <p className="text-slate-400 mt-8">&copy; {new Date().getFullYear()} {settings.clinicName}. Todos los derechos reservados.</p>
                  <div className="mt-6">
                     <button 
                         onClick={onNavigateToLogin} 
@@ -262,7 +267,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onBookAppointment, set
         </footer>
 
         {showPromotion && activePromotion && <PromotionModal onClose={() => setShowPromotion(false)} onBook={() => setIsModalOpen(true)} promotion={activePromotion} />}
-        {isModalOpen && <AppointmentForm onClose={() => setIsModalOpen(false)} onBookAppointment={onBookAppointment} doctors={doctors} />}
+        {isModalOpen && <AppointmentForm onClose={() => setIsModalOpen(false)} onBookAppointment={handleAppointmentFormSubmit} doctors={doctors} />}
     </div>
   );
 };

@@ -1,4 +1,7 @@
 
+
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
@@ -96,8 +99,8 @@ const AdminAccountsView: React.FC<{
             const summary = summaries[record.patientId];
             if (summary) {
                 const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
-                // FIX: Explicitly cast payment amount to Number to prevent arithmetic errors.
-                const paid = (record.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+                // FIX: Explicitly type `p` as `Payment` to ensure `p.amount` is treated as a number, preventing arithmetic errors.
+                const paid = (record.payments || []).reduce((sum, p: Payment) => sum + Number(p.amount), 0);
                 
                 summary.totalBilled = billed;
                 summary.totalPaid = paid;
@@ -178,8 +181,8 @@ const AdminDashboardView: React.FC<{
                     }
                 });
             });
-            (record.payments || []).forEach(payment => {
-                // FIX: Explicitly cast payment amount to Number to prevent arithmetic errors.
+            // FIX: Explicitly type `payment` as `Payment` to ensure `payment.amount` is treated as a number, preventing arithmetic errors.
+            (record.payments || []).forEach((payment: Payment) => {
                 revenue += Number(payment.amount);
             });
         });
@@ -204,10 +207,10 @@ const AdminDashboardView: React.FC<{
         // FIX: Refactored to use Object.keys for iterating over patientRecords. This provides more stable type inference than Object.values, resolving an arithmetic error when calculating daily payment totals.
         Object.keys(patientRecords).forEach(patientId => {
             const record = patientRecords[patientId];
-            (record.payments || []).forEach(payment => {
+            // FIX: Explicitly type `payment` to ensure `payment.amount` is treated as a number. This resolves a type inference issue that could lead to arithmetic errors.
+            (record.payments || []).forEach((payment: Payment) => {
                 const paymentDay = new Date(payment.date).toDateString();
                 if (dailyTotals[paymentDay] !== undefined) {
-                    // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type. Cast to Number.
                     dailyTotals[paymentDay] += Number(payment.amount);
                 }
             });
@@ -623,6 +626,46 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                                     <label htmlFor="loginImageUrl" className="block text-sm font-medium text-slate-700 dark:text-slate-300">URL Imagen (Login)</label>
                                     <input type="text" name="loginImageUrl" id="loginImageUrl" value={localSettings.loginImageUrl} onChange={handleSettingsChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
                                 </div>
+
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">Configuración de Pagos</h3>
+                                
+                                <div className="space-y-4 p-4 border rounded-lg border-slate-300 dark:border-slate-600">
+                                    <h4 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Yape</h4>
+                                    <div>
+                                        <label htmlFor="yapeQrUrl" className="block text-sm font-medium text-slate-700 dark:text-slate-300">URL de QR Yape</label>
+                                        <input type="text" name="yapeQrUrl" id="yapeQrUrl" value={localSettings.yapeInfo.qrUrl} onChange={e => setLocalSettings(p => ({ ...p, yapeInfo: { ...p.yapeInfo, qrUrl: e.target.value } }))} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="yapeRecipientName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nombre del Titular (Yape)</label>
+                                        <input type="text" name="yapeRecipientName" id="yapeRecipientName" value={localSettings.yapeInfo.recipientName} onChange={e => setLocalSettings(p => ({ ...p, yapeInfo: { ...p.yapeInfo, recipientName: e.target.value } }))} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="yapePhoneNumber" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Número de Teléfono (Yape)</label>
+                                        <input type="text" name="yapePhoneNumber" id="yapePhoneNumber" value={localSettings.yapeInfo.phoneNumber} onChange={e => setLocalSettings(p => ({ ...p, yapeInfo: { ...p.yapeInfo, phoneNumber: e.target.value } }))} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-4 p-4 border rounded-lg border-slate-300 dark:border-slate-600">
+                                    <h4 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Plin</h4>
+                                    <div>
+                                        <label htmlFor="plinQrUrl" className="block text-sm font-medium text-slate-700 dark:text-slate-300">URL de QR Plin</label>
+                                        <input type="text" name="plinQrUrl" id="plinQrUrl" value={localSettings.plinInfo.qrUrl} onChange={e => setLocalSettings(p => ({ ...p, plinInfo: { ...p.plinInfo, qrUrl: e.target.value } }))} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="plinRecipientName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nombre del Titular (Plin)</label>
+                                        <input type="text" name="plinRecipientName" id="plinRecipientName" value={localSettings.plinInfo.recipientName} onChange={e => setLocalSettings(p => ({ ...p, plinInfo: { ...p.plinInfo, recipientName: e.target.value } }))} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="plinPhoneNumber" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Número de Teléfono (Plin)</label>
+                                        <input type="text" name="plinPhoneNumber" id="plinPhoneNumber" value={localSettings.plinInfo.phoneNumber} onChange={e => setLocalSettings(p => ({ ...p, plinInfo: { ...p.plinInfo, phoneNumber: e.target.value } }))} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label htmlFor="whatsappNumber" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Número de WhatsApp (para confirmación de cita)</label>
+                                    <input type="text" name="whatsappNumber" id="whatsappNumber" value={localSettings.whatsappNumber} onChange={handleSettingsChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                                </div>
+
                                 <div className="pt-2 text-right">
                                      <button type="submit" className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-6 rounded-lg">Guardar Cambios</button>
                                 </div>

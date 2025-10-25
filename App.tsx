@@ -4,10 +4,13 @@ import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { AdminPage } from './components/AdminPage';
 import { ConsultationRoom } from './components/ConsultationRoom';
+// FIX: Corrected typo 'OdogramState' to 'OdontogramState'.
 import type { Appointment, Doctor, Promotion, AppSettings, PatientRecord, OdontogramState, Payment } from './types';
 import { DENTAL_SERVICES_MAP, ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS } from './constants';
+import { PaymentModal } from './components/PaymentModal';
 
 const initialToothState = { surfaces: { buccal: [], lingual: [], occlusal: [], distal: [], mesial: [], root: [] }, whole: [], findings: [] };
+// FIX: Corrected typo 'OdogramState' to 'OdontogramState'.
 const createInitialOdontogram = (teeth: number[]): OdontogramState => teeth.reduce((acc, toothId) => ({ ...acc, [toothId]: structuredClone(initialToothState) }), {});
 
 // Mock data for initial state
@@ -51,6 +54,17 @@ const MOCK_SETTINGS: AppSettings = {
     clinicEmail: 'info@kiru.com',
     heroImageUrl: 'https://images.unsplash.com/photo-1606811413289-29109a63da4a?q=80&w=2070&auto=format&fit=crop',
     loginImageUrl: 'https://images.unsplash.com/photo-1629904850781-2a6d71c1c739?q=80&w=1974&auto=format&fit=crop',
+    yapeInfo: {
+        qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=yape-payment-info-kiru-ana',
+        recipientName: 'Ana García (Yape)',
+        phoneNumber: '987654321',
+    },
+    plinInfo: {
+        qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=plin-payment-info-kiru-carlos',
+        recipientName: 'Carlos Martinez (Plin)',
+        phoneNumber: '912345678',
+    },
+    whatsappNumber: '51987654321',
 };
 
 const MOCK_PATIENT_RECORDS: Record<string, PatientRecord> = {
@@ -122,6 +136,7 @@ function App() {
     
     const [currentPatientIndex, setCurrentPatientIndex] = useState<number | null>(null);
     const [initialTabForConsultation, setInitialTabForConsultation] = useState<MainView | undefined>();
+    const [pendingAppointment, setPendingAppointment] = useState<Omit<Appointment, 'id' | 'status'> | null>(null);
 
 
     const sortedAppointments = useMemo(() => 
@@ -141,16 +156,41 @@ function App() {
         setPage('landing');
     };
 
-    const handleBookAppointment = (appointmentData: Omit<Appointment, 'id' | 'status'>) => {
+    const handleInitiateBooking = (appointmentData: Omit<Appointment, 'id' | 'status'>) => {
+        setPendingAppointment(appointmentData);
+    };
+
+    const handlePaymentConfirmation = () => {
+        if (!pendingAppointment) return;
+
         const newAppointment: Appointment = {
-            ...appointmentData,
+            ...pendingAppointment,
             id: crypto.randomUUID(),
             status: 'requested',
         };
         setAppointments(prev => [...prev, newAppointment]);
-        alert(`¡Solicitud de cita enviada para ${appointmentData.name}!\nServicio: ${DENTAL_SERVICES_MAP[appointmentData.service]}\nFecha y Hora: ${new Date(appointmentData.dateTime).toLocaleString()}\nNos pondremos en contacto para confirmar.`);
+
+        // Construct and open WhatsApp link
+        const message = `¡Hola! Acabo de agendar mi cita en ${settings.clinicName}. Aquí están los detalles:\n\n*Paciente:* ${newAppointment.name}\n*Servicio:* ${DENTAL_SERVICES_MAP[newAppointment.service]}\n*Fecha y Hora:* ${new Date(newAppointment.dateTime).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' })}\n\nPor favor, adjunto mi voucher de pago para confirmar la cita. ¡Gracias!`;
+        const whatsappUrl = `https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+
+        alert(`¡Solicitud de cita enviada para ${newAppointment.name}!\nAhora serás redirigido a WhatsApp para enviar tu voucher y confirmar la cita.`);
+        setPendingAppointment(null);
     };
     
+    const handlePayLaterConfirmation = () => {
+        if (!pendingAppointment) return;
+        const newAppointment: Appointment = {
+            ...pendingAppointment,
+            id: crypto.randomUUID(),
+            status: 'requested',
+        };
+        setAppointments(prev => [...prev, newAppointment]);
+        setPendingAppointment(null);
+        alert(`¡Cita solicitada para ${newAppointment.name}!\nPor favor, completa el pago en la clínica para confirmar tu cita.`);
+    };
+
     const handleOpenClinicalRecord = (patient: Appointment, targetTab?: MainView) => {
         const patientIndex = sortedAppointments.findIndex(p => p.id === patient.id);
         setCurrentPatientIndex(patientIndex);
@@ -191,7 +231,7 @@ function App() {
         // We can use a callback with setPatientRecords.
         setPatientRecords(prev => ({...prev, [currentPatient.id]: newRecord}));
         return newRecord;
-    }, [currentPatient, patientRecords]);
+    }, [currentPatient, patientRecords, setPatientRecords]);
 
 
     const handleNavigateToAdmin = () => {
@@ -316,32 +356,26 @@ function App() {
     
     const activePromotion = promotions.find(p => p.isActive) || null;
 
-    if (page === 'landing') {
-        return <LandingPage onBookAppointment={handleBookAppointment} settings={settings} onNavigateToLogin={() => setPage('login')} activePromotion={activePromotion} doctors={doctors} />;
-    }
-
-    if (page === 'login') {
-        return <LoginPage onLogin={handleLogin} onNavigateToLanding={() => setPage('landing')} settings={settings} />;
-    }
-
     if (page === 'admin' && isAuthenticated) {
-        return <AdminPage 
-            appointments={appointments}
-            doctors={doctors}
-            promotions={promotions}
-            settings={settings}
-            patientRecords={patientRecords}
-            onSaveAppointment={handleSaveAppointment}
-            onDeleteAppointment={handleDeleteAppointment}
-            onSaveDoctor={handleSaveDoctor}
-            onDeleteDoctor={handleDeleteDoctor}
-            onSavePromotion={handleSavePromotion}
-            onDeletePromotion={handleDeletePromotion}
-            onTogglePromotionStatus={togglePromotionStatus}
-            setSettings={setSettings}
-            onLogout={handleLogout}
-            onOpenClinicalRecord={handleOpenClinicalRecord}
-        />;
+        return <>
+            <AdminPage 
+                appointments={appointments}
+                doctors={doctors}
+                promotions={promotions}
+                settings={settings}
+                patientRecords={patientRecords}
+                onSaveAppointment={handleSaveAppointment}
+                onDeleteAppointment={handleDeleteAppointment}
+                onSaveDoctor={handleSaveDoctor}
+                onDeleteDoctor={handleDeleteDoctor}
+                onSavePromotion={handleSavePromotion}
+                onDeletePromotion={handleDeletePromotion}
+                onTogglePromotionStatus={togglePromotionStatus}
+                setSettings={setSettings}
+                onLogout={handleLogout}
+                onOpenClinicalRecord={handleOpenClinicalRecord}
+            />
+        </>;
     }
     
     if (page === 'consultation' && isAuthenticated && currentPatient && currentPatientRecord) {
@@ -364,7 +398,24 @@ function App() {
         return <div className="flex h-screen items-center justify-center bg-gray-100">Cargando ficha del paciente...</div>;
     }
 
-    return null;
+    return (
+        <>
+            {page === 'landing' && <LandingPage onBookAppointment={handleInitiateBooking} settings={settings} onNavigateToLogin={() => setPage('login')} activePromotion={activePromotion} doctors={doctors} />}
+            {page === 'login' && <LoginPage onLogin={handleLogin} onNavigateToLanding={() => setPage('landing')} settings={settings} />}
+            {/* The rest of the page logic is in the authenticated section above */}
+
+            {/* Payment Modal for landing page flow */}
+            {pendingAppointment && !isAuthenticated && (
+                <PaymentModal
+                    appointment={pendingAppointment}
+                    settings={settings}
+                    onConfirm={handlePaymentConfirmation}
+                    onPayLater={handlePayLaterConfirmation}
+                    onClose={() => setPendingAppointment(null)}
+                />
+            )}
+        </>
+    );
 }
 
 export default App;
