@@ -101,7 +101,11 @@ function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<Rea
     try {
       const stickyValue = window.localStorage.getItem(key);
       if (stickyValue !== null) {
-        return JSON.parse(stickyValue);
+        const parsedValue = JSON.parse(stickyValue);
+        // FIX: Merge the stored value with the default value.
+        // This ensures that if the data structure in localStorage is outdated (e.g., missing new keys like `yapeInfo`),
+        // the application doesn't crash when trying to access properties of undefined. It creates a more robust state initialization.
+        return { ...defaultValue, ...parsedValue };
       }
     } catch (error) {
       console.error(`Error parsing localStorage key "${key}":`, error);

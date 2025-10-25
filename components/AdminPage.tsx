@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
@@ -173,14 +175,12 @@ const AdminDashboardView: React.FC<{
         // FIX: Used Object.keys to iterate over patient records for reliable type inference, preventing potential arithmetic errors during calculations.
         Object.keys(patientRecords).forEach(patientId => {
             const record = patientRecords[patientId];
-            (record.sessions || []).forEach(session => {
-                session.treatments.forEach(treatment => {
-                    const price = TREATMENTS_MAP[treatment.treatmentId]?.price || 0;
-                    if (treatment.status === 'proposed') {
-                        proposedValue += price;
-                    }
-                });
-            });
+            // FIX: Refactored the calculation to use `reduce` which has better type inference in this context, resolving an arithmetic error.
+            proposedValue += (record.sessions || [])
+                .flatMap(s => s.treatments)
+                .filter(t => t.status === 'proposed')
+                .reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
+
             // FIX: Explicitly type `payment` as `Payment` to ensure `payment.amount` is treated as a number, preventing arithmetic errors.
             (record.payments || []).forEach((payment: Payment) => {
                 revenue += Number(payment.amount);
