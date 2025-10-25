@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import type { Appointment, AppSettings } from '../types';
 import { CloseIcon } from './icons';
@@ -25,16 +26,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ appointment, setting
         <>
             <div>
                 <h3 className="text-lg font-semibold text-blue-600 mb-3">Selecciona tu método de pago</h3>
-                <div className="flex border border-slate-300 rounded-lg p-1">
+                <div className="flex border border-slate-300 rounded-lg p-1 bg-slate-100">
                      <button 
                         onClick={() => setPaymentMethod('yape')}
-                        className={`flex-1 py-2 rounded-md font-semibold transition-colors ${paymentMethod === 'yape' ? 'bg-purple-600 text-white' : 'hover:bg-slate-100'}`}
+                        className={`flex-1 py-2 rounded-md font-semibold transition-all duration-300 transform ${paymentMethod === 'yape' ? 'bg-purple-600 text-white shadow-md scale-105' : 'hover:bg-slate-200'}`}
                     >
                         Yape
                     </button>
                     <button 
                         onClick={() => setPaymentMethod('plin')}
-                        className={`flex-1 py-2 rounded-md font-semibold transition-colors ${paymentMethod === 'plin' ? 'bg-blue-700 text-white' : 'hover:bg-slate-100'}`}
+                        className={`flex-1 py-2 rounded-md font-semibold transition-all duration-300 transform ${paymentMethod === 'plin' ? 'bg-blue-700 text-white shadow-md scale-105' : 'hover:bg-slate-200'}`}
                     >
                         Plin
                     </button>
@@ -46,7 +47,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ appointment, setting
                 <img 
                     src={paymentDetails.qrUrl} 
                     alt={`QR para ${paymentMethod}`} 
-                    className="w-48 h-48 mx-auto rounded-lg" 
+                    className="w-48 h-48 mx-auto rounded-lg shadow-sm" 
                 />
                 <div className="mt-4 text-center space-y-1">
                     <p className="text-sm text-slate-500">A nombre de:</p>
@@ -93,12 +94,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ appointment, setting
 
                     <div>
                         <h3 className="text-lg font-semibold text-blue-600 mb-3">2. Elige una opción de pago</h3>
-                         <div className="grid grid-cols-2 gap-4">
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <button 
                                 onClick={() => setPaymentOption('payNow')}
-                                className={`p-4 rounded-lg border-2 text-center font-semibold transition-all ${paymentOption === 'payNow' ? 'border-pink-500 bg-pink-50 ring-2 ring-pink-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+                                className={`p-4 rounded-lg border-2 text-center font-semibold transition-all relative ${paymentOption === 'payNow' ? 'border-pink-500 bg-pink-50 ring-2 ring-pink-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
                             >
                                 Pagar Ahora
+                                <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Recomendado</span>
                             </button>
                             <button 
                                 onClick={() => setPaymentOption('payLater')}
@@ -115,15 +117,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ appointment, setting
                 <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl mt-auto">
                     <button 
                         onClick={paymentOption === 'payNow' ? onConfirm : onPayLater}
-                        className={`w-full text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-all transform hover:scale-105 text-base ${
+                        className={`w-full text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-all transform hover:-translate-y-1 text-base ${
                             paymentOption === 'payNow' 
-                            ? 'bg-green-600 hover:bg-green-700'
-                            : 'bg-blue-600 hover:bg-blue-700'
+                            ? 'bg-green-600 hover:bg-green-700 shadow-green-500/30'
+                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'
                         }`}
                     >
                         {paymentOption === 'payNow' 
                             ? '¡Listo! Enviar voucher por WhatsApp'
-                            : 'Confirmar Cita (Pagar en Clínica)'
+                            : 'Solicitar Cita (Pago Pendiente)'
                         }
                     </button>
                 </div>

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 // FIX: Changed import to be a relative path.
 import type { Appointment, Doctor } from '../types';
@@ -98,7 +99,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 w-10">
                                         <UserIcon />
                                     </div>
-                                    <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} required className="block w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-base text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-slate-400" placeholder="Ej. Ana Torres" />
+                                    <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} required className="block w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-base text-slate-900 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors placeholder:text-slate-400" placeholder="Ej. Ana Torres" />
                                 </div>
                             </div>
                             {/* Phone Field */}
@@ -108,7 +109,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 w-10">
                                         <PhoneIcon />
                                     </div>
-                                    <input type="tel" id="phone" value={phone} onChange={e => setPhone(e.target.value)} required className="block w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-base text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-slate-400" placeholder="Ej. 987 654 321"/>
+                                    <input type="tel" id="phone" value={phone} onChange={e => setPhone(e.target.value)} required className="block w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-base text-slate-900 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors placeholder:text-slate-400" placeholder="Ej. 987 654 321"/>
                                 </div>
                             </div>
                             {/* Email Field */}
@@ -118,7 +119,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 w-10">
                                         <EmailIcon />
                                     </div>
-                                    <input type="email" id="email" value={email} onChange={e => setEmail(e.target.value)} required className="block w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-base text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-slate-400" placeholder="ejemplo@correo.com"/>
+                                    <input type="email" id="email" value={email} onChange={e => setEmail(e.target.value)} required className="block w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-base text-slate-900 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors placeholder:text-slate-400" placeholder="ejemplo@correo.com"/>
                                 </div>
                             </div>
                             {/* Service Field */}
@@ -133,7 +134,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                                         value={service} 
                                         onChange={e => setService(e.target.value)} 
                                         required 
-                                        className="appearance-none block w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-11 pr-10 text-base text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                                        className="appearance-none block w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-11 pr-10 text-base text-slate-900 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors"
                                     >
                                         <option value="" disabled>Seleccione el motivo de su visita</option>
                                         {DENTAL_SERVICES.map(s => (
@@ -166,7 +167,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                                         disabled={!hasSlots}
                                         className={`p-3 rounded-lg text-center transition-all duration-300 transform flex-shrink-0 w-28 ${
                                             isSelected
-                                            ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-300 -translate-y-1'
+                                            ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg ring-2 ring-blue-300 -translate-y-1'
                                             : hasSlots
                                             ? 'bg-slate-100 hover:bg-blue-100 hover:-translate-y-1'
                                             : 'bg-slate-50 text-slate-400 cursor-not-allowed'
@@ -194,8 +195,8 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                                                 onClick={() => setSelectedSlot(slot.toISOString())}
                                                 className={`p-2 rounded-md border text-sm font-semibold transition-colors duration-200 ${
                                                     selectedSlot === slot.toISOString() 
-                                                    ? 'bg-pink-600 text-white border-pink-700 shadow transform scale-105' 
-                                                    : 'bg-slate-50 hover:bg-pink-100 border-slate-300'
+                                                    ? 'bg-gradient-to-br from-pink-500 to-pink-600 text-white border-pink-700 shadow-md transform scale-105' 
+                                                    : 'bg-slate-50 hover:bg-pink-100 hover:border-pink-300 border-slate-300'
                                                 }`}
                                             >
                                                 {slot.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false })}
@@ -215,9 +216,9 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({ onClose, onBoo
                         type="submit"
                         onClick={handleSubmit}
                         disabled={!selectedSlot || !name || !email || !phone || !service}
-                        className="w-full bg-pink-600 text-white px-8 py-3 rounded-lg hover:bg-pink-700 font-semibold shadow-lg disabled:bg-slate-400 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:scale-100 text-base"
+                        className="w-full bg-pink-600 text-white px-8 py-3 rounded-lg hover:bg-pink-700 font-semibold shadow-lg shadow-pink-500/20 disabled:bg-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all transform hover:-translate-y-1 disabled:translate-y-0 text-base"
                     >
-                        Continuar con el Pago
+                        Agendar y Pagar
                     </button>
                 </div>
             </div>

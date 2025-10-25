@@ -20,8 +20,9 @@ export const DENTAL_TREATMENTS: DentalTreatment[] = [
 ];
 
 export const DENTAL_SERVICES = [
-    { id: 'prevention', label: 'Prevención y Diagnóstico' },
-    { id: 'restorations', label: 'Restauraciones' },
+    { id: 'general_consultation', label: 'Consulta General / Diagnóstico' },
+    { id: 'prevention', label: 'Limpieza y Prevención' },
+    { id: 'restorations', label: 'Restauraciones (Curaciones)' },
     { id: 'endodontics', label: 'Endodoncia' },
     { id: 'orthodontics', label: 'Ortodoncia' },
     { id: 'oral_surgery', label: 'Cirugía Bucal' },
