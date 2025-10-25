@@ -15,13 +15,25 @@ export const AdminPaymentModal: React.FC<AdminPaymentModalProps> = ({ payment, p
 
     useEffect(() => {
         if (payment) {
-            setFormData({
-                id: (payment as Payment & { patientId: string }).id || '',
-                patientId: payment.patientId || '',
-                date: payment.date ? new Date(payment.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-                amount: payment.amount?.toString() || '',
-                method: payment.method || 'Efectivo',
-            });
+            // FIX: Used a type guard to safely handle the union type for the 'payment' prop. This resolves errors when accessing properties that only exist on an existing payment object.
+            if ('id' in payment && payment.id) { // Editing existing payment
+                const existingPayment = payment as Payment & { patientId: string };
+                setFormData({
+                    id: existingPayment.id,
+                    patientId: existingPayment.patientId || '',
+                    date: existingPayment.date ? new Date(existingPayment.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                    amount: existingPayment.amount?.toString() || '',
+                    method: existingPayment.method || 'Efectivo',
+                });
+            } else { // Creating new payment
+                setFormData({
+                    id: '',
+                    patientId: payment.patientId || '',
+                    date: new Date().toISOString().slice(0, 10),
+                    amount: '',
+                    method: 'Efectivo',
+                });
+            }
         }
     }, [payment]);
 
@@ -54,7 +66,8 @@ export const AdminPaymentModal: React.FC<AdminPaymentModalProps> = ({ payment, p
 
     if (!payment) return null;
     
-    const isNew = !(payment as Payment).id;
+    // FIX: Replaced unsafe type assertion with a safe property check to determine if the payment is new.
+    const isNew = !('id' in payment && payment.id);
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">

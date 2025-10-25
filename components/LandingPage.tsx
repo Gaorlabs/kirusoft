@@ -8,7 +8,7 @@ import type { Appointment, AppSettings, Promotion, Doctor } from '../types';
 
 
 interface LandingPageProps {
-  onBookAppointment: (appointmentData: Omit<Appointment, 'id' | 'status'>) => void;
+  onOpenAppointmentForm: () => void;
   settings: AppSettings;
   onNavigateToLogin: () => void;
   activePromotion: Promotion | null;
@@ -91,8 +91,7 @@ const PromotionModal: React.FC<{
 );
 
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onBookAppointment, settings, onNavigateToLogin, activePromotion, doctors }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export const LandingPage: React.FC<LandingPageProps> = ({ onOpenAppointmentForm, settings, onNavigateToLogin, activePromotion, doctors }) => {
   const [showPromotion, setShowPromotion] = useState(false);
   
   useEffect(() => {
@@ -110,11 +109,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onBookAppointment, set
     }
   }, [activePromotion]);
 
-  const handleAppointmentFormSubmit = (appointmentData: Omit<Appointment, 'id' | 'status'>) => {
-      onBookAppointment(appointmentData);
-      setIsModalOpen(false);
-  };
-
   return (
     <div className="bg-slate-50 text-slate-800 font-sans">
       <header className="absolute top-0 left-0 right-0 z-50 p-4">
@@ -130,7 +124,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onBookAppointment, set
                 <a href="#services" className="text-gray-600 hover:text-blue-600 transition-colors font-medium">Servicios</a>
                 <a href="#contact" className="text-gray-600 hover:text-blue-600 transition-colors font-medium">Contacto</a>
               </div>
-              <button onClick={() => setIsModalOpen(true)} className="hidden md:block bg-pink-500 text-white px-5 py-2 rounded-full hover:bg-pink-600 font-semibold shadow-md transition-all transform hover:scale-105">
+              <button onClick={onOpenAppointmentForm} className="hidden md:block bg-pink-500 text-white px-5 py-2 rounded-full hover:bg-pink-600 font-semibold shadow-md transition-all transform hover:scale-105">
                 Agenda tu Cita
               </button>
             </nav>
@@ -146,7 +140,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onBookAppointment, set
                  Descubre una experiencia dental diferente. En Kiru, combinamos tecnología de punta con un trato cálido y personalizado para que te sientas como en casa.
                 </p>
                 <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 justify-center md:justify-start">
-                  <button onClick={() => setIsModalOpen(true)} className="bg-pink-500 text-white px-10 py-4 text-lg rounded-full hover:bg-pink-600 font-semibold shadow-lg transform hover:scale-105 transition-transform duration-300">
+                  <button onClick={onOpenAppointmentForm} className="bg-pink-500 text-white px-10 py-4 text-lg rounded-full hover:bg-pink-600 font-semibold shadow-lg transform hover:scale-105 transition-transform duration-300">
                     Agendar Cita Ahora
                   </button>
                   <a href="#about" className="border-2 border-white/80 text-white px-10 py-4 text-lg rounded-full hover:bg-white hover:text-blue-700 font-semibold transition-colors duration-300 text-center">
@@ -266,8 +260,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onBookAppointment, set
             </div>
         </footer>
 
-        {showPromotion && activePromotion && <PromotionModal onClose={() => setShowPromotion(false)} onBook={() => setIsModalOpen(true)} promotion={activePromotion} />}
-        {isModalOpen && <AppointmentForm onClose={() => setIsModalOpen(false)} onBookAppointment={handleAppointmentFormSubmit} doctors={doctors} />}
+        {showPromotion && activePromotion && <PromotionModal onClose={() => setShowPromotion(false)} onBook={onOpenAppointmentForm} promotion={activePromotion} />}
     </div>
   );
 };

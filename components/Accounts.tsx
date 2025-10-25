@@ -85,7 +85,15 @@ interface AccountsProps {
     onDeletePayment: (paymentId: string, patientId: string) => void;
 }
 
-const AccountStatementToPrint = React.forwardRef<HTMLDivElement, Omit<AccountsProps, 'onSavePayment' | 'onDeletePayment' | 'patientId'>>(({ sessions, patientName, clinicName, payments }, ref) => {
+// FIX: Defined a specific interface for the component's props to resolve a type error where `clinicName` was missing.
+interface AccountStatementToPrintProps {
+    sessions: Session[];
+    patientName: string;
+    clinicName: string;
+    payments: Payment[];
+}
+
+const AccountStatementToPrint = React.forwardRef<HTMLDivElement, AccountStatementToPrintProps>(({ sessions, patientName, clinicName, payments }, ref) => {
     const allTreatments = useMemo(() => sessions.flatMap(s => s.treatments.map(t => ({ ...t, sessionName: s.name }))), [sessions]);
     const totalCost = useMemo(() => allTreatments.reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0), [allTreatments]);
     const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + p.amount, 0), [payments]);

@@ -8,6 +8,7 @@ import { ConsultationRoom } from './components/ConsultationRoom';
 import type { Appointment, Doctor, Promotion, AppSettings, PatientRecord, OdontogramState, Payment } from './types';
 import { DENTAL_SERVICES_MAP, ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS } from './constants';
 import { PaymentModal } from './components/PaymentModal';
+import { AppointmentForm } from './components/AppointmentForm';
 
 const initialToothState = { surfaces: { buccal: [], lingual: [], occlusal: [], distal: [], mesial: [], root: [] }, whole: [], findings: [] };
 // FIX: Corrected typo 'OdogramState' to 'OdontogramState'.
@@ -136,6 +137,9 @@ function App() {
     
     const [currentPatientIndex, setCurrentPatientIndex] = useState<number | null>(null);
     const [initialTabForConsultation, setInitialTabForConsultation] = useState<MainView | undefined>();
+    
+    // State for booking flow modals
+    const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
     const [pendingAppointment, setPendingAppointment] = useState<Omit<Appointment, 'id' | 'status'> | null>(null);
 
 
@@ -156,8 +160,15 @@ function App() {
         setPage('landing');
     };
 
+    // This is called from LandingPage to open the appointment form
+    const handleOpenAppointmentForm = () => {
+        setIsAppointmentFormOpen(true);
+    };
+
+    // This is called from AppointmentForm to proceed to payment
     const handleInitiateBooking = (appointmentData: Omit<Appointment, 'id' | 'status'>) => {
-        setPendingAppointment(appointmentData);
+        setIsAppointmentFormOpen(false); // Close appointment form
+        setPendingAppointment(appointmentData); // Set data for payment modal
     };
 
     const handlePaymentConfirmation = () => {
@@ -400,9 +411,17 @@ function App() {
 
     return (
         <>
-            {page === 'landing' && <LandingPage onBookAppointment={handleInitiateBooking} settings={settings} onNavigateToLogin={() => setPage('login')} activePromotion={activePromotion} doctors={doctors} />}
+            {page === 'landing' && <LandingPage onOpenAppointmentForm={handleOpenAppointmentForm} settings={settings} onNavigateToLogin={() => setPage('login')} activePromotion={activePromotion} doctors={doctors} />}
             {page === 'login' && <LoginPage onLogin={handleLogin} onNavigateToLanding={() => setPage('landing')} settings={settings} />}
-            {/* The rest of the page logic is in the authenticated section above */}
+            
+            {/* Appointment Form Modal for landing page flow */}
+            {isAppointmentFormOpen && !isAuthenticated && (
+                 <AppointmentForm
+                    onClose={() => setIsAppointmentFormOpen(false)}
+                    onBookAppointment={handleInitiateBooking}
+                    doctors={doctors}
+                 />
+            )}
 
             {/* Payment Modal for landing page flow */}
             {pendingAppointment && !isAuthenticated && (
