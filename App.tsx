@@ -373,8 +373,10 @@ function App() {
     
     const activePromotion = promotions.find(p => p.isActive) || null;
 
+    let pageContent;
+
     if (page === 'admin' && isAuthenticated) {
-        return <>
+        pageContent = (
             <AdminPage 
                 appointments={appointments}
                 doctors={doctors}
@@ -392,33 +394,33 @@ function App() {
                 onLogout={handleLogout}
                 onOpenClinicalRecord={handleOpenClinicalRecord}
             />
-        </>;
+        );
+    } else if (page === 'consultation' && isAuthenticated && currentPatient && currentPatientRecord) {
+        pageContent = (
+            <ConsultationRoom
+                patient={currentPatient}
+                patientRecord={currentPatientRecord}
+                onSave={handleSavePatientRecord}
+                onNavigateToAdmin={handleNavigateToAdmin}
+                onNavigateToPatient={handleNavigateToPatient}
+                isFirstPatient={currentPatientIndex === 0}
+                isLastPatient={currentPatientIndex === sortedAppointments.length - 1}
+                onSavePayment={handleSavePayment}
+                onDeletePayment={handleDeletePayment}
+                initialTab={initialTabForConsultation}
+            />
+        );
+    } else if (page === 'consultation' && isAuthenticated && currentPatientIndex !== null && !currentPatientRecord) {
+        pageContent = <div className="flex h-screen items-center justify-center bg-gray-100">Cargando ficha del paciente...</div>;
+    } else if (page === 'login') {
+        pageContent = <LoginPage onLogin={handleLogin} onNavigateToLanding={() => setPage('landing')} settings={settings} />;
+    } else { // default to landing
+        pageContent = <LandingPage onOpenAppointmentForm={handleOpenAppointmentForm} settings={settings} onNavigateToLogin={() => setPage('login')} activePromotion={activePromotion} doctors={doctors} />;
     }
     
-    if (page === 'consultation' && isAuthenticated && currentPatient && currentPatientRecord) {
-        return <ConsultationRoom
-            patient={currentPatient}
-            patientRecord={currentPatientRecord}
-            onSave={handleSavePatientRecord}
-            onNavigateToAdmin={handleNavigateToAdmin}
-            onNavigateToPatient={handleNavigateToPatient}
-            isFirstPatient={currentPatientIndex === 0}
-            isLastPatient={currentPatientIndex === sortedAppointments.length - 1}
-            onSavePayment={handleSavePayment}
-            onDeletePayment={handleDeletePayment}
-            initialTab={initialTabForConsultation}
-        />;
-    }
-    
-    // Fallback or loading state
-    if (page === 'consultation' && isAuthenticated && currentPatientIndex !== null && !currentPatientRecord) {
-        return <div className="flex h-screen items-center justify-center bg-gray-100">Cargando ficha del paciente...</div>;
-    }
-
     return (
         <>
-            {page === 'landing' && <LandingPage onOpenAppointmentForm={handleOpenAppointmentForm} settings={settings} onNavigateToLogin={() => setPage('login')} activePromotion={activePromotion} doctors={doctors} />}
-            {page === 'login' && <LoginPage onLogin={handleLogin} onNavigateToLanding={() => setPage('landing')} settings={settings} />}
+            {pageContent}
             
             {/* Appointment Form Modal for landing page flow */}
             {bookingStage === 'form' && !isAuthenticated && (
