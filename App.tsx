@@ -122,6 +122,7 @@ function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<Rea
 
 type Page = 'landing' | 'login' | 'admin' | 'consultation';
 type MainView = 'odontogram' | 'plan' | 'history' | 'prescriptions' | 'consents' | 'accounts';
+type BookingStage = 'idle' | 'form' | 'payment';
 
 
 function App() {
@@ -138,9 +139,9 @@ function App() {
     const [currentPatientIndex, setCurrentPatientIndex] = useState<number | null>(null);
     const [initialTabForConsultation, setInitialTabForConsultation] = useState<MainView | undefined>();
     
-    // State for booking flow modals
-    const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
-    const [pendingAppointment, setPendingAppointment] = useState<Omit<Appointment, 'id' | 'status'> | null>(null);
+    // State for booking flow modals using a state machine
+    const [bookingStage, setBookingStage] = useState<BookingStage>('idle');
+    const [pendingAppointmentData, setPendingAppointmentData] = useState<Omit<Appointment, 'id' | 'status'> | null>(null);
 
 
     const sortedAppointments = useMemo(() => 
@@ -159,23 +160,28 @@ function App() {
         setIsAuthenticated(false);
         setPage('landing');
     };
+    
+    const handleCloseBookingModals = () => {
+        setBookingStage('idle');
+        setPendingAppointmentData(null);
+    };
 
     // This is called from LandingPage to open the appointment form
     const handleOpenAppointmentForm = () => {
-        setIsAppointmentFormOpen(true);
+        setBookingStage('form');
     };
 
     // This is called from AppointmentForm to proceed to payment
     const handleInitiateBooking = (appointmentData: Omit<Appointment, 'id' | 'status'>) => {
-        setIsAppointmentFormOpen(false); // Close appointment form
-        setPendingAppointment(appointmentData); // Set data for payment modal
+        setPendingAppointmentData(appointmentData);
+        setBookingStage('payment');
     };
 
     const handlePaymentConfirmation = () => {
-        if (!pendingAppointment) return;
+        if (!pendingAppointmentData) return;
 
         const newAppointment: Appointment = {
-            ...pendingAppointment,
+            ...pendingAppointmentData,
             id: crypto.randomUUID(),
             status: 'requested',
         };
@@ -187,18 +193,18 @@ function App() {
         window.open(whatsappUrl, '_blank');
 
         alert(`¡Solicitud de cita enviada para ${newAppointment.name}!\nAhora serás redirigido a WhatsApp para enviar tu voucher y confirmar la cita.`);
-        setPendingAppointment(null);
+        handleCloseBookingModals();
     };
     
     const handlePayLaterConfirmation = () => {
-        if (!pendingAppointment) return;
+        if (!pendingAppointmentData) return;
         const newAppointment: Appointment = {
-            ...pendingAppointment,
+            ...pendingAppointmentData,
             id: crypto.randomUUID(),
             status: 'requested',
         };
         setAppointments(prev => [...prev, newAppointment]);
-        setPendingAppointment(null);
+        handleCloseBookingModals();
         alert(`¡Cita solicitada para ${newAppointment.name}!\nPor favor, completa el pago en la clínica para confirmar tu cita.`);
     };
 
@@ -415,22 +421,22 @@ function App() {
             {page === 'login' && <LoginPage onLogin={handleLogin} onNavigateToLanding={() => setPage('landing')} settings={settings} />}
             
             {/* Appointment Form Modal for landing page flow */}
-            {isAppointmentFormOpen && !isAuthenticated && (
+            {bookingStage === 'form' && !isAuthenticated && (
                  <AppointmentForm
-                    onClose={() => setIsAppointmentFormOpen(false)}
+                    onClose={handleCloseBookingModals}
                     onBookAppointment={handleInitiateBooking}
                     doctors={doctors}
                  />
             )}
 
             {/* Payment Modal for landing page flow */}
-            {pendingAppointment && !isAuthenticated && (
+            {bookingStage === 'payment' && pendingAppointmentData && !isAuthenticated && (
                 <PaymentModal
-                    appointment={pendingAppointment}
+                    appointment={pendingAppointmentData}
                     settings={settings}
                     onConfirm={handlePaymentConfirmation}
                     onPayLater={handlePayLaterConfirmation}
-                    onClose={() => setPendingAppointment(null)}
+                    onClose={handleCloseBookingModals}
                 />
             )}
         </>
