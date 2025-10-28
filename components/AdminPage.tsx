@@ -8,8 +8,10 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment } from '../types';
+import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
 import {
     DashboardIcon, AppointmentIcon, UsersIcon, MegaphoneIcon, SettingsIcon, PlusIcon, PencilIcon, TrashIcon, BriefcaseIcon, DentalIcon, MoonIcon, SunIcon, OdontogramIcon, ChevronDownIcon, CalendarIcon, WhatsappIcon, DollarSignIcon
@@ -104,10 +106,11 @@ const AdminAccountsView: React.FC<{
             const record = patientRecords[patientId];
             const summary = summaries[record.patientId];
             if (summary) {
-                const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
+                // FIX: Explicitly typing the accumulator and item parameters in `reduce` prevents type inference issues that can lead to arithmetic errors, especially when amounts might be strings from localStorage.
+                const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum: number, t: AppliedTreatment) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
                 // FIX: Explicitly type `p` as `Payment` to ensure `p.amount` is treated as a number, preventing arithmetic errors.
                 // Added `|| 0` to handle cases where amount might be NaN or not a valid number.
-                const paid = (record.payments || []).reduce((sum, p: Payment) => sum + (Number(p.amount) || 0), 0);
+                const paid = (record.payments || []).reduce((sum: number, p: Payment) => sum + (Number(p.amount) || 0), 0);
                 
                 summary.totalBilled = billed;
                 summary.totalPaid = paid;
