@@ -224,34 +224,40 @@ function App() {
         return sortedAppointments[currentPatientIndex];
     }, [currentPatientIndex, sortedAppointments]);
 
-    const currentPatientRecord = useMemo(() => {
-        if (!currentPatient) return null;
-        
+    // State for the loaded patient record to avoid side-effects in render
+    const [currentPatientRecord, setCurrentPatientRecord] = useState<PatientRecord | null>(null);
+
+    useEffect(() => {
+        if (!currentPatient) {
+            setCurrentPatientRecord(null);
+            return;
+        }
+
         const record = patientRecords[currentPatient.id];
         if (record) {
-             return {
+            setCurrentPatientRecord({
                 ...record,
                 prescriptions: record.prescriptions || [],
                 consents: record.consents || [],
                 payments: record.payments || [],
+            });
+        } else {
+            // This is a new patient record, create it and update the global state
+            const newRecord: PatientRecord = {
+                patientId: currentPatient.id,
+                permanentOdontogram: createInitialOdontogram(ALL_TEETH_PERMANENT),
+                deciduousOdontogram: createInitialOdontogram(ALL_TEETH_DECIDUOUS),
+                sessions: [],
+                medicalAlerts: [],
+                prescriptions: [],
+                consents: [],
+                payments: [],
             };
+            // Update the main records state. This will trigger a re-render.
+            setPatientRecords(prev => ({ ...prev, [currentPatient.id]: newRecord }));
+            // Set the local record state so the UI can update immediately without waiting for the next effect run.
+            setCurrentPatientRecord(newRecord);
         }
-        
-        const newRecord: PatientRecord = {
-            patientId: currentPatient.id,
-            permanentOdontogram: createInitialOdontogram(ALL_TEETH_PERMANENT),
-            deciduousOdontogram: createInitialOdontogram(ALL_TEETH_DECIDUOUS),
-            sessions: [],
-            medicalAlerts: [],
-            prescriptions: [],
-            consents: [],
-            payments: [],
-        };
-        
-        // This part needs to be handled carefully to avoid infinite loops if it triggers a re-render.
-        // We can use a callback with setPatientRecords.
-        setPatientRecords(prev => ({...prev, [currentPatient.id]: newRecord}));
-        return newRecord;
     }, [currentPatient, patientRecords, setPatientRecords]);
 
 

@@ -4,6 +4,10 @@
 
 
 
+
+
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
@@ -102,7 +106,8 @@ const AdminAccountsView: React.FC<{
             if (summary) {
                 const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
                 // FIX: Explicitly type `p` as `Payment` to ensure `p.amount` is treated as a number, preventing arithmetic errors.
-                const paid = (record.payments || []).reduce((sum, p: Payment) => sum + Number(p.amount), 0);
+                // Added `|| 0` to handle cases where amount might be NaN or not a valid number.
+                const paid = (record.payments || []).reduce((sum, p: Payment) => sum + (Number(p.amount) || 0), 0);
                 
                 summary.totalBilled = billed;
                 summary.totalPaid = paid;
@@ -172,18 +177,17 @@ const AdminDashboardView: React.FC<{
         let proposedValue = 0;
         let revenue = 0;
         
-        // FIX: Used Object.keys to iterate over patient records for reliable type inference, preventing potential arithmetic errors during calculations.
         Object.keys(patientRecords).forEach(patientId => {
             const record = patientRecords[patientId];
-            // FIX: Refactored the calculation to use `reduce` which has better type inference in this context, resolving an arithmetic error.
             proposedValue += (record.sessions || [])
                 .flatMap(s => s.treatments)
                 .filter(t => t.status === 'proposed')
                 .reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
 
             // FIX: Explicitly type `payment` as `Payment` to ensure `payment.amount` is treated as a number, preventing arithmetic errors.
+            // Added `|| 0` to handle cases where amount might be NaN or not a valid number.
             (record.payments || []).forEach((payment: Payment) => {
-                revenue += Number(payment.amount);
+                revenue += (Number(payment.amount) || 0);
             });
         });
 
@@ -204,14 +208,14 @@ const AdminDashboardView: React.FC<{
 
         const dailyTotals: Record<string, number> = last7Days.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
 
-        // FIX: Refactored to use Object.keys for iterating over patientRecords. This provides more stable type inference than Object.values, resolving an arithmetic error when calculating daily payment totals.
         Object.keys(patientRecords).forEach(patientId => {
             const record = patientRecords[patientId];
             // FIX: Explicitly type `payment` to ensure `payment.amount` is treated as a number. This resolves a type inference issue that could lead to arithmetic errors.
+            // Added `|| 0` to handle cases where amount might be NaN or not a valid number.
             (record.payments || []).forEach((payment: Payment) => {
                 const paymentDay = new Date(payment.date).toDateString();
                 if (dailyTotals[paymentDay] !== undefined) {
-                    dailyTotals[paymentDay] += Number(payment.amount);
+                    dailyTotals[paymentDay] += (Number(payment.amount) || 0);
                 }
             });
         });
@@ -239,7 +243,6 @@ const AdminDashboardView: React.FC<{
             }));
     }, [appointments]);
 
-    // FIX: Pre-calculate max count to avoid division by zero or undefined, resolving arithmetic operation type errors.
     const maxPopularServiceCount = popularServices.length > 0 ? popularServices[0].count : 1;
 
     const todaysAppointmentList = useMemo(() => {

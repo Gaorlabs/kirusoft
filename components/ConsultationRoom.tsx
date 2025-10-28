@@ -136,6 +136,54 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
 
     }, [setOdontogramState]);
     
+    const applyCompletedTreatment = useCallback((treatmentId: ToothCondition | WholeToothCondition, toothInfo: { toothId: number; surface: ToothSurfaceName | 'whole' }) => {
+        const treatmentInfo = DENTAL_TREATMENTS.find(t => t.id === treatmentId);
+        if (!treatmentInfo) return;
+
+        setOdontogramState(prevState => {
+            const { toothId, surface } = toothInfo;
+            const tooth = prevState[toothId];
+            if (!tooth) return prevState;
+
+            const newTreatment: AppliedTreatment = {
+                id: crypto.randomUUID(),
+                treatmentId,
+                toothId,
+                surface,
+                status: 'completed',
+                sessionId: 'historical',
+            };
+            
+            const updatedTooth = structuredClone(tooth);
+            
+            const updateLocation = (key: ToothSurfaceName | 'whole') => {
+                const targetArray = key === 'whole' ? updatedTooth.whole : updatedTooth.surfaces[key as ToothSurfaceName];
+                if (!targetArray.some(t => t.treatmentId === treatmentId)) {
+                    targetArray.push(newTreatment);
+                }
+            };
+
+            if (treatmentInfo.appliesTo === 'surface' && surface !== 'whole' && surface !== 'root') {
+                 if (treatmentId === 'crown') {
+                    Object.keys(updatedTooth.surfaces).forEach(s => {
+                        if (s !== 'root') updatedTooth.surfaces[s as ToothSurfaceName] = [newTreatment];
+                    });
+                } else {
+                   updateLocation(surface as ToothSurfaceName);
+                }
+            } else if (treatmentInfo.appliesTo === 'root' && (surface === 'root' || surface === 'whole')) {
+                updateLocation('root');
+            } else if (treatmentInfo.appliesTo === 'whole_tooth') {
+                updateLocation('whole');
+                Object.keys(updatedTooth.surfaces).forEach(s => {
+                    updatedTooth.surfaces[s as ToothSurfaceName] = [];
+                });
+            }
+
+            return { ...prevState, [toothId]: updatedTooth };
+        });
+    }, [setOdontogramState]);
+
      const updateFinding = (findingId: string, newCondition: ToothCondition | WholeToothCondition) => {
         setRecord(prev => {
             const newRecord = structuredClone(prev);
@@ -176,10 +224,17 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
     };
 
     const handleSelectTreatmentFromModal = (treatmentId: ToothCondition | WholeToothCondition) => {
+        const treatmentInfo = DENTAL_TREATMENTS.find(t => t.id === treatmentId);
+    
         if (editingFinding) {
             updateFinding(editingFinding.id, treatmentId);
-        } else if (activeTooth) {
-            addFinding(treatmentId, activeTooth);
+        } else if (activeTooth && treatmentInfo) {
+            // Pathologies and proposed extractions are findings. Others are historical completed treatments.
+            if (treatmentInfo.category === 'Patología' || treatmentInfo.id === 'extraction') {
+                addFinding(treatmentId, activeTooth);
+            } else {
+                applyCompletedTreatment(treatmentId, activeTooth);
+            }
         }
         setIsTreatmentModalOpen(false);
         setActiveTooth(null);
