@@ -52,6 +52,7 @@ export interface Session {
     notes: string;
     documents: { id: string; name: string; type: 'pdf' | 'image' | 'doc' }[];
     scheduledDate?: string;
+    doctorId?: string;
 }
 
 export type AppointmentStatus = 'requested' | 'confirmed' | 'waiting' | 'in_consultation' | 'completed' | 'canceled';
@@ -138,6 +139,22 @@ export interface MedicalHistory {
     familyHistory: string;
 }
 
+export interface ProposedSession {
+    id: string;
+    name: string;
+    scheduledDate: string;
+    findingIds: string[];
+    doctorId?: string;
+}
+
+export interface Budget {
+    id: string;
+    name: string;
+    date: string;
+    status: 'proposed' | 'accepted' | 'rejected';
+    proposedSessions: ProposedSession[];
+}
+
 export interface PatientRecord {
     patientId: string;
     permanentOdontogram: OdontogramState;
@@ -147,6 +164,11 @@ export interface PatientRecord {
     prescriptions: Prescription[];
     consents: ConsentForm[];
     payments: Payment[];
+    budgets: Budget[];
+    recall?: {
+        date: string;
+        reason: string;
+    };
 }
 
 export interface AdminAppointmentModalProps {

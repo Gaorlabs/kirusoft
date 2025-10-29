@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Odontogram } from './Odontogram';
 import { Toolbar } from './Toolbar';
 import { TreatmentPlan } from './TreatmentPlan';
-import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor, MedicalHistory } from '../types';
+import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor, MedicalHistory, Budget, ProposedSession } from '../types';
 import { ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, DENTAL_TREATMENTS, QUADRANTS_PERMANENT, QUADRANTS_DECIDUOUS, TREATMENTS_MAP } from '../constants';
 import { DentalIcon, SaveIcon, MoonIcon, SunIcon, CalendarIcon, ArrowLeftIcon, OdontogramIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, FileTextIcon, ClipboardListIcon, DollarSignIcon, PlusIcon } from './icons';
 import { ClinicalFindings } from './ClinicalFindings';
@@ -253,14 +253,35 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
         setEditingFinding(null);
     };
     
-    const handleSavePlan = (proposedSessions: { name: string; scheduledDate?: string; findingIds: string[] }[]) => {
+     const handleSaveBudget = (proposedSessions: Omit<ProposedSession, 'id'>[]) => {
+        const newBudget: Budget = {
+            id: crypto.randomUUID(),
+            name: `Presupuesto ${new Date().toLocaleDateString()}`,
+            date: new Date().toISOString(),
+            status: 'proposed',
+            proposedSessions: proposedSessions.map(ps => ({...ps, id: crypto.randomUUID()})),
+        };
+
+        setRecord(prev => ({
+            ...prev,
+            budgets: [...prev.budgets, newBudget],
+        }));
+        
+        alert('Presupuesto guardado con éxito.');
+        setActiveView('plan');
+    };
+
+    const handleActivateBudget = (budgetId: string) => {
+        const budgetToActivate = record.budgets.find(b => b.id === budgetId);
+        if (!budgetToActivate) return;
+    
         const newSessions: Session[] = [];
         const assignedFindingIds = new Set<string>();
-
-        for (const proposed of proposedSessions) {
+    
+        for (const proposed of budgetToActivate.proposedSessions) {
             const sessionId = crypto.randomUUID();
             const treatments: AppliedTreatment[] = [];
-
+    
             for (const findingId of proposed.findingIds) {
                 const finding = allFindings.find(f => f.id === findingId);
                 if (finding) {
@@ -275,7 +296,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                     assignedFindingIds.add(findingId);
                 }
             }
-
+    
             newSessions.push({
                 id: sessionId,
                 name: proposed.name,
@@ -285,26 +306,28 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                 treatments: treatments,
                 notes: '',
                 documents: [],
+                doctorId: proposed.doctorId,
             });
         }
-        
+    
         setRecord(prev => {
             const newRecord = structuredClone(prev);
             newRecord.sessions = newSessions;
+            newRecord.budgets = prev.budgets.map(b => 
+                b.id === budgetId ? { ...b, status: 'accepted' } : { ...b, status: b.status === 'accepted' ? 'rejected' : b.status }
+            );
 
-            // FIX: Explicitly type `tooth` as `ToothState` to resolve a TypeScript inference issue where `Object.values` returns `unknown[]`.
             Object.values(newRecord.permanentOdontogram).forEach((tooth: ToothState) => {
                 tooth.findings = tooth.findings.filter(f => !assignedFindingIds.has(f.id));
             });
-            // FIX: Explicitly type `tooth` as `ToothState` to resolve a TypeScript inference issue where `Object.values` returns `unknown[]`.
             Object.values(newRecord.deciduousOdontogram).forEach((tooth: ToothState) => {
                 tooth.findings = tooth.findings.filter(f => !assignedFindingIds.has(f.id));
             });
-            
+    
             return newRecord;
         });
-        
-        alert('Plan de tratamiento guardado.');
+    
+        alert('Plan de tratamiento activado.');
     };
     
     const handleToggleTreatmentStatus = (sessionId: string, treatmentId: string) => {
@@ -391,6 +414,10 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
     const handleUpdateMedicalHistory = (medicalHistory: MedicalHistory) => {
         setRecord(prev => ({ ...prev, medicalHistory }));
     };
+
+    const onUpdateRecall = (recallData?: { date: string; reason: string; }) => {
+        setRecord(prev => ({ ...prev, recall: recallData }));
+    };
     
     const quadrants = isPermanent ? QUADRANTS_PERMANENT : QUADRANTS_DECIDUOUS;
     
@@ -437,14 +464,14 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
             </header>
             <div className="flex flex-1 overflow-hidden">
                 <aside className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 overflow-y-auto">
-                    <PatientFile patient={patient} record={record} onUpdateMedicalHistory={handleUpdateMedicalHistory} />
+                    <PatientFile patient={patient} record={record} onUpdateMedicalHistory={handleUpdateMedicalHistory} onUpdateRecall={onUpdateRecall} />
                 </aside>
                 
                 <main className="flex-1 flex flex-col p-4 overflow-hidden">
                     <div className="border-b border-gray-200 dark:border-gray-700 mb-4">
                         <nav className="flex space-x-1">
                             <TabButton view="odontogram" label="Odontograma" icon={<OdontogramIcon className="w-5 h-5"/>} />
-                            <TabButton view="plan" label="Plan Tratamiento" icon={<CalendarIcon className="w-5 h-5"/>} />
+                            <TabButton view="plan" label="Presupuestos" icon={<CalendarIcon className="w-5 h-5"/>} />
                             <TabButton view="history" label="Historial" icon={<BriefcaseIcon className="w-5 h-5"/>} />
                             <TabButton view="prescriptions" label="Recetas" icon={<FileTextIcon className="w-5 h-5"/>} />
                             <TabButton view="consents" label="Consentimientos" icon={<ClipboardListIcon className="w-5 h-5"/>} />
@@ -479,14 +506,14 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                                         onDeleteFinding={handleDeleteFinding}
                                         onEditFinding={handleEditFindingClick}
                                     />
-                                     {allFindings.length > 0 && record.sessions.length === 0 && (
+                                     {allFindings.length > 0 && (
                                         <div className="mt-6 text-center">
                                             <button
                                                 onClick={() => setActiveView('plan')}
                                                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2 mx-auto shadow-lg hover:shadow-xl transition-shadow transform hover:-translate-y-0.5"
                                             >
                                                 <PlusIcon className="w-5 h-5" />
-                                                <span>Crear Plan de Tratamiento</span>
+                                                <span>Crear Presupuesto</span>
                                             </button>
                                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Crea una cotización y organiza los tratamientos en sesiones para el paciente.</p>
                                         </div>
@@ -494,7 +521,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                                 </div>
                             </div>
                         )}
-                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSavePlan={handleSavePlan} onToggleTreatmentStatus={handleToggleTreatmentStatus}/>}
+                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveBudget={handleSaveBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} patient={patient} />}
                          {activeView === 'history' && <ClinicalHistory sessions={record.sessions} onUpdateSession={handleUpdateSession} />}
                          {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} doctors={doctors} treatments={allCompletedTreatments} />}
                          {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} patientName={patient.name} doctors={doctors} />}

@@ -86,12 +86,14 @@ const MOCK_PATIENT_RECORDS: Record<string, PatientRecord> = {
         sessions: [
             { id: 'sess1', name: 'Sesión 1', status: 'completed', treatments: [
                 { id: 'treat1', treatmentId: 'filling', toothId: 16, surface: 'occlusal', status: 'completed', sessionId: 'sess1' }
-            ], date: new Date('2023-10-15').toISOString(), notes: 'Revisión inicial completa. Paciente presenta buena higiene bucal.', documents: [] }
+            ], date: new Date('2023-10-15').toISOString(), notes: 'Revisión inicial completa. Paciente presenta buena higiene bucal.', documents: [], doctorId: 'doc1' }
         ],
         medicalHistory: { ...initialMedicalHistory, systemicDiseases: ['Hipertensión controlada.'] },
         prescriptions: [],
         consents: [],
         payments: [{ id: 'pay1', date: new Date('2023-10-15').toISOString(), amount: 120, method: 'Efectivo' }],
+        budgets: [],
+        recall: { date: new Date(new Date().setDate(new Date().getDate() + 90)).toISOString(), reason: 'Control de Ortodoncia' },
     },
     'apt4': { // Laura Sanchez
         patientId: 'apt4',
@@ -102,6 +104,7 @@ const MOCK_PATIENT_RECORDS: Record<string, PatientRecord> = {
         prescriptions: [],
         consents: [],
         payments: [],
+        budgets: [],
     }
 };
 
@@ -250,6 +253,7 @@ function App() {
                 prescriptions: record.prescriptions || [],
                 consents: record.consents || [],
                 payments: record.payments || [],
+                budgets: record.budgets || [],
             });
         } else {
             // This is a new patient record, create it and update the global state
@@ -262,6 +266,7 @@ function App() {
                 prescriptions: [],
                 consents: [],
                 payments: [],
+                budgets: [],
             };
             // Update the main records state. This will trigger a re-render.
             setPatientRecords(prev => ({ ...prev, [currentPatient.id]: newRecord }));
