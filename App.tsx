@@ -125,7 +125,7 @@ function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<Rea
           // Special handling for treatments to re-add icons which are not stored.
           if (key === 'kiru-treatments') {
              const defaultMap = (defaultValue as DentalTreatment[]).reduce((acc, t) => ({...acc, [t.id]: t.icon}), {} as Record<string, React.ReactNode>);
-             return parsedValue.map(t => ({ ...t, icon: defaultMap[t.id] || <DentalIcon /> })) as T;
+             return parsedValue.map((t: DentalTreatment) => ({ ...t, icon: defaultMap[t.id] || <DentalIcon /> })) as T;
           }
           // For all other arrays, just return the parsed value
           return parsedValue as T;
@@ -322,7 +322,7 @@ function App() {
             ...prev,
             [record.patientId]: record
         }));
-        alert('Ficha clínica guardada con éxito.');
+        // We no longer show an alert here, as saving is more frequent.
     };
 
     // --- CRUD Handlers ---
@@ -475,7 +475,7 @@ function App() {
                 throw new Error(`Error del servidor: ${response.statusText}`);
             }
             
-            console.log("Enviado a n8n con éxito", await response.json());
+            console.log("Enviado a n8n con éxito");
             return true;
         } catch (error) {
             console.error("Error al enviar a n8n:", error);

@@ -134,9 +134,11 @@ export function ConsultationRoom({
                 }
 
                 if (elementToRender) {
-                    root.render(elementToRender);
-                    
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => root.render(
+                      <React.StrictMode>
+                        {React.cloneElement(elementToRender, { ref: (el: HTMLDivElement) => { if(el) resolve(el); } })}
+                      </React.StrictMode>
+                    ));
                     
                     const htmlContent = tempDiv.innerHTML;
                     
@@ -391,6 +393,7 @@ export function ConsultationRoom({
     };
     
     const handleSaveOrUpdateBudget = (budgetData: Partial<Budget> & { proposedSessions: Omit<ProposedSession, 'id'>[] }) => {
+        let updatedRecord: PatientRecord;
         setRecord(prev => {
             const newRecord = structuredClone(prev);
             
@@ -404,25 +407,33 @@ export function ConsultationRoom({
             } else { // Create
                 const newBudget: Budget = {
                     id: crypto.randomUUID(),
-                    name: `Presupuesto ${new Date().toLocaleDateString()}`,
+                    name: budgetData.name || `Presupuesto ${new Date().toLocaleDateString()}`,
                     date: new Date().toISOString(),
                     status: 'proposed',
+                    observations: budgetData.observations,
                     proposedSessions: budgetData.proposedSessions.map(ps => ({ ...ps, id: crypto.randomUUID() })),
                 };
                 newRecord.budgets.push(newBudget);
             }
-            
+            updatedRecord = newRecord;
             return newRecord;
         });
+        // Immediately save to global state to update Admin view
+        setTimeout(() => onSave(updatedRecord), 0);
         alert('Presupuesto guardado con éxito.');
         setActiveView('plan');
     };
 
     const handleUpdateBudget = (budgetId: string, updatedData: Partial<Budget>) => {
-        setRecord(prev => ({
-            ...prev,
-            budgets: prev.budgets.map(b => b.id === budgetId ? { ...b, ...updatedData } : b)
-        }));
+        let updatedRecord: PatientRecord;
+        setRecord(prev => {
+             updatedRecord = {
+                ...prev,
+                budgets: prev.budgets.map(b => b.id === budgetId ? { ...b, ...updatedData } : b)
+            };
+            return updatedRecord;
+        });
+        setTimeout(() => onSave(updatedRecord), 0);
     };
 
     const handleActivateBudget = (budgetId: string) => {

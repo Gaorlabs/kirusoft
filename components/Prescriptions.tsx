@@ -4,8 +4,6 @@ import React, { useState, useRef, useMemo } from 'react';
 import type { Prescription, Doctor, Medication } from '../types';
 import { PlusIcon, FileTextIcon, CloseIcon, PrintIcon, DentalIcon, TrashIcon, WhatsappIcon } from './icons';
 import { COMMON_MEDICATIONS, COMMON_RECOMMENDATIONS } from '../constants';
-import { PrescriptionToPrint } from './PrescriptionToPrint';
-
 
 interface PrescriptionModalProps {
     onClose: () => void;

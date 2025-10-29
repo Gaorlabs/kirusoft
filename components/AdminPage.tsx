@@ -250,7 +250,7 @@ const AdminBudgetsView: React.FC<{
                         {allBudgets.map(budget => {
                             const isEditing = editingBudget?.id === budget.id;
                             return (
-                                <tr key={budget.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                <tr key={budget.id} className={`border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 ${isEditing ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
                                     <td className="px-4 py-2 font-medium text-slate-900 dark:text-white">{budget.patientName}</td>
                                     <td className="px-4 py-2">{budget.name}</td>
                                     <td className="px-4 py-2">
@@ -1084,7 +1084,7 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                                 <div>
                                     <label htmlFor="n8nWebhookUrl" className="block text-sm font-medium text-slate-700 dark:text-slate-300">URL de Webhook n8n</label>
                                     <input type="text" name="n8nWebhookUrl" id="n8nWebhookUrl" value={localSettings.n8nWebhookUrl} onChange={handleSettingsChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
-                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Pega aquí la URL del webhook de n8n para activar el envío de documentos por WhatsApp.</p>
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Pega aquí la URL del webhook de n8n para activar el envío de documentos por WhatsApp. Puedes crear uno gratis en n8n.cloud.</p>
                                 </div>
 
                                 <div className="pt-2 text-right">

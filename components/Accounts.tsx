@@ -3,7 +3,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { Session, Payment, DentalTreatment } from '../types';
 import { PrintIcon, DentalIcon, PlusIcon, CloseIcon, TrashIcon, DollarSignIcon, CheckIcon, PencilIcon, WhatsappIcon } from './icons';
-import { PaymentReceiptToPrint } from './PaymentReceiptToPrint';
 
 interface PaymentModalProps {
     onClose: () => void;
@@ -78,18 +77,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ onClose, onSave, paymentToE
 
 interface AccountSummaryModalProps {
     onClose: () => void;
-    onPrintA4: () => void;
     sessions: Session[];
     patientName: string;
     totalCost: number;
     totalPaid: number;
     balance: number;
     treatmentsMap: Record<string, DentalTreatment>;
+    onAction: (action: 'print' | 'send', type: 'accountStatement', item: any) => void;
+    isSending: boolean;
 }
 
-const AccountSummaryModal: React.FC<AccountSummaryModalProps> = ({ onClose, onPrintA4, sessions, patientName, totalCost, totalPaid, balance, treatmentsMap }) => {
+const AccountSummaryModal: React.FC<AccountSummaryModalProps> = ({ onClose, sessions, patientName, totalCost, totalPaid, balance, treatmentsMap, onAction, isSending }) => {
     const allTreatments = useMemo(() => sessions.flatMap(s => s.treatments.map(t => ({ ...t, sessionName: s.name }))), [sessions]);
-
+    const summaryData = { sessions, totalCost, totalPaid, balance, patientName, treatmentsMap };
+    
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm max-h-[90vh] flex flex-col">
@@ -147,7 +148,7 @@ const AccountSummaryModal: React.FC<AccountSummaryModalProps> = ({ onClose, onPr
                 
                 <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
                     <button type="button" onClick={onClose} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 py-2 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold">Cerrar</button>
-                    <button type="button" onClick={onPrintA4} className="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 font-semibold flex items-center space-x-2"><PrintIcon className="w-4 h-4" /><span>Imprimir A4</span></button>
+                    <button type="button" onClick={() => onAction('print', 'accountStatement', summaryData)} className="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 font-semibold flex items-center space-x-2"><PrintIcon className="w-4 h-4" /><span>Imprimir</span></button>
                 </div>
             </div>
         </div>
@@ -274,12 +275,9 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
             {showSummaryModal && (
                 <AccountSummaryModal
                     onClose={() => setShowSummaryModal(false)}
-                    onPrintA4={() => {
-                        onAction('print', 'accountStatement', { sessions, payments, patientName });
-                        setShowSummaryModal(false);
-                    }}
+                    onAction={onAction}
+                    isSending={isSending}
                     sessions={sessions}
-                    payments={payments}
                     patientName={patientName}
                     totalCost={totalCost}
                     totalPaid={totalPaid}
