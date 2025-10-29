@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { Session, Payment, DentalTreatment } from '../types';
-import { PrintIcon, DentalIcon, PlusIcon, CloseIcon, TrashIcon, DollarSignIcon, CheckIcon, PencilIcon } from './icons';
+import { PrintIcon, DentalIcon, PlusIcon, CloseIcon, TrashIcon, DollarSignIcon, CheckIcon, PencilIcon, WhatsappIcon } from './icons';
 import { PaymentReceiptToPrint } from './PaymentReceiptToPrint';
 
 interface PaymentModalProps {
@@ -80,7 +80,6 @@ interface AccountSummaryModalProps {
     onClose: () => void;
     onPrintA4: () => void;
     sessions: Session[];
-    payments: Payment[];
     patientName: string;
     totalCost: number;
     totalPaid: number;
@@ -164,88 +163,9 @@ interface AccountsProps {
     treatments: DentalTreatment[];
     onSavePayment: (paymentData: { patientId: string; amount: number; method: string; date: string; id?: string }) => void;
     onDeletePayment: (paymentId: string, patientId: string) => void;
+    onAction: (action: 'print' | 'send', type: 'paymentReceipt' | 'accountStatement', item: any) => void;
+    isSending: boolean;
 }
-
-interface AccountStatementToPrintProps {
-    sessions: Session[];
-    patientName: string;
-    clinicName: string;
-    payments: Payment[];
-    treatmentsMap: Record<string, DentalTreatment>;
-}
-
-const AccountStatementToPrint = React.forwardRef<HTMLDivElement, AccountStatementToPrintProps>(({ sessions, patientName, clinicName, payments, treatmentsMap }, ref) => {
-    const allTreatments = useMemo(() => sessions.flatMap(s => s.treatments.map(t => ({ ...t, sessionName: s.name }))), [sessions]);
-    const totalCost = useMemo(() => allTreatments.reduce((sum, t) => sum + (treatmentsMap[t.treatmentId]?.price || 0), 0), [allTreatments, treatmentsMap]);
-    const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + p.amount, 0), [payments]);
-    const balance = totalCost - totalPaid;
-
-    return (
-        <div ref={ref} className="p-8 font-sans text-gray-800">
-            <div className="flex justify-between items-start pb-4 border-b">
-                <div>
-                    <h1 className="text-3xl font-bold">{clinicName} Dental</h1>
-                    <p>Av. Sonrisas 123, Lima, Perú</p>
-                </div>
-                <div className="w-16 h-16 text-blue-500"><DentalIcon /></div>
-            </div>
-            <div className="my-6">
-                <h2 className="text-2xl font-semibold mb-2">Estado de Cuenta</h2>
-                <p><span className="font-semibold">Fecha de Emisión:</span> {new Date().toLocaleDateString()}</p>
-                <p><span className="font-semibold">Paciente:</span> {patientName}</p>
-            </div>
-            <h3 className="text-lg font-semibold mt-6 mb-2">Detalle de Tratamientos</h3>
-            <table className="w-full text-left text-sm">
-                <thead>
-                    <tr className="bg-gray-100">
-                        <th className="p-2">Tratamiento</th>
-                        <th className="p-2">Detalle</th>
-                        <th className="p-2 text-right">Costo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {allTreatments.map(t => {
-                        const info = treatmentsMap[t.treatmentId];
-                        return (
-                            <tr key={t.id} className="border-b">
-                                <td className="p-2">{info?.label}</td>
-                                <td className="p-2 text-gray-600">Diente: {t.toothId} ({t.sessionName})</td>
-                                <td className="p-2 text-right">S/ {info?.price.toFixed(2)}</td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-            <h3 className="text-lg font-semibold mt-6 mb-2">Historial de Pagos</h3>
-            <table className="w-full text-left text-sm">
-                <thead>
-                    <tr className="bg-gray-100">
-                        <th className="p-2">Fecha</th>
-                        <th className="p-2">Método</th>
-                        <th className="p-2 text-right">Monto</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {payments.map(p => (
-                         <tr key={p.id} className="border-b">
-                            <td className="p-2">{new Date(p.date).toLocaleDateString()}</td>
-                            <td className="p-2 text-gray-600">{p.method}</td>
-                            <td className="p-2 text-right">S/ {p.amount.toFixed(2)}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            <div className="flex justify-end mt-6">
-                <div className="w-2/5 space-y-2">
-                    <div className="flex justify-between font-semibold"><span>Costo Total:</span><span>S/ {totalCost.toFixed(2)}</span></div>
-                    <div className="flex justify-between font-semibold text-green-600"><span>Total Pagado:</span><span>S/ {totalPaid.toFixed(2)}</span></div>
-                    <div className="flex justify-between font-bold text-xl border-t pt-2 mt-2"><span>Saldo Pendiente:</span><span>S/ {balance.toFixed(2)}</span></div>
-                </div>
-            </div>
-            <p className="text-center text-sm text-gray-500 mt-8">¡Gracias por su confianza!</p>
-        </div>
-    );
-});
 
 const StatCard: React.FC<{ title: string; value: string; colorClass: string; icon: React.ReactNode }> = ({ title, value, colorClass, icon }) => (
     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center space-x-4">
@@ -259,10 +179,8 @@ const StatCard: React.FC<{ title: string; value: string; colorClass: string; ico
     </div>
 );
 
-export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payments, patientName, treatments, onSavePayment, onDeletePayment }) => {
-    const printRef = useRef<HTMLDivElement>(null);
+export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payments, patientName, treatments, onSavePayment, onDeletePayment, onAction, isSending }) => {
     const [editingPayment, setEditingPayment] = useState<Payment | null | {}>(null);
-    const [itemToPrint, setItemToPrint] = useState<Payment | 'statement' | null>(null);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
 
     const treatmentsMap = useMemo(() => 
@@ -287,29 +205,6 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
     const handleDeletePayment = (paymentId: string) => {
         onDeletePayment(paymentId, patientId);
     };
-    
-    useEffect(() => {
-        if (itemToPrint) {
-            const printContent = printRef.current;
-            if (printContent) {
-                const WinPrint = window.open('', '', 'width=900,height=650');
-                if (WinPrint) {
-                    WinPrint.document.write('<html><head><title>Recibo</title>');
-                    WinPrint.document.write('<script src="https://cdn.tailwindcss.com"></script>');
-                    WinPrint.document.write('</head><body>');
-                    WinPrint.document.write(printContent.innerHTML);
-                    WinPrint.document.write('</body></html>');
-                    WinPrint.document.close();
-                    WinPrint.focus();
-                    setTimeout(() => {
-                        WinPrint.print();
-                        WinPrint.close();
-                        setItemToPrint(null);
-                    }, 500); // Delay to ensure content is rendered
-                }
-            }
-        }
-    }, [itemToPrint]);
 
     return (
         <div>
@@ -352,8 +247,11 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
                                         <td className="px-4 py-3 text-right font-semibold">S/ {p.amount.toFixed(2)}</td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex items-center justify-center space-x-1">
-                                                <button onClick={() => setItemToPrint(p)} className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full" title="Imprimir Recibo">
+                                                <button onClick={() => onAction('print', 'paymentReceipt', p)} className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full" title="Imprimir Recibo">
                                                     <PrintIcon className="w-4 h-4" />
+                                                </button>
+                                                <button onClick={() => onAction('send', 'paymentReceipt', p)} disabled={isSending} className="p-1 text-green-500 hover:bg-green-100 dark:hover:bg-gray-700 rounded-full disabled:opacity-50" title="Enviar Recibo por WhatsApp">
+                                                    <WhatsappIcon className="w-4 h-4"/>
                                                 </button>
                                                 <button onClick={() => setEditingPayment(p)} className="p-1 text-yellow-500 hover:bg-yellow-100 dark:hover:bg-gray-700 rounded-full" title="Editar Pago">
                                                     <PencilIcon className="w-4 h-4"/>
@@ -377,7 +275,7 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
                 <AccountSummaryModal
                     onClose={() => setShowSummaryModal(false)}
                     onPrintA4={() => {
-                        setItemToPrint('statement');
+                        onAction('print', 'accountStatement', { sessions, payments, patientName });
                         setShowSummaryModal(false);
                     }}
                     sessions={sessions}
@@ -389,11 +287,6 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
                     treatmentsMap={treatmentsMap}
                 />
             )}
-
-            <div className="hidden">
-                 {itemToPrint === 'statement' && <AccountStatementToPrint ref={printRef} sessions={sessions} clinicName="Kiru" payments={payments} patientName={patientName} treatmentsMap={treatmentsMap} />}
-                 {itemToPrint && typeof itemToPrint === 'object' && <PaymentReceiptToPrint ref={printRef} payment={itemToPrint} clinicName="Kiru" patientName={patientName} />}
-            </div>
         </div>
     );
 };

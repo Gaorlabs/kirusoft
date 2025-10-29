@@ -95,6 +95,7 @@ export interface AppSettings {
         phoneNumber: string;
     };
     whatsappNumber: string;
+    n8nWebhookUrl: string;
 }
 
 export interface Medication {
@@ -155,6 +156,7 @@ export interface Budget {
     proposedSessions: ProposedSession[];
     followUpDate?: string;
     notes?: string;
+    observations?: string;
 }
 
 export interface PatientRecord {

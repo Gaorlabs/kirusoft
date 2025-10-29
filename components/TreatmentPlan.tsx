@@ -17,6 +17,7 @@ const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, o
     const [sessions, setSessions] = useState<ProposedSession[]>([{ id: crypto.randomUUID(), name: `Sesión 1`, scheduledDate: '', findingIds: [], doctorId: doctors[0]?.id || '' }]);
     const [unassignedFindings, setUnassignedFindings] = useState<ClinicalFinding[]>(findings);
     const [budgetName, setBudgetName] = useState(`Presupuesto ${new Date().toLocaleDateString()}`);
+    const [observations, setObservations] = useState('');
 
     const treatmentsMap = useMemo(() => 
         treatments.reduce((acc, treatment) => {
@@ -29,6 +30,7 @@ const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, o
         if (budgetToEdit) {
             setBudgetName(budgetToEdit.name);
             setSessions(budgetToEdit.proposedSessions);
+            setObservations(budgetToEdit.observations || '');
             const assignedFindingIds = new Set(budgetToEdit.proposedSessions.flatMap(s => s.findingIds));
             setUnassignedFindings(findings.filter(f => !assignedFindingIds.has(f.id)));
         } else {
@@ -91,6 +93,7 @@ const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, o
         onSaveBudget({ 
             id: budgetToEdit?.id,
             name: budgetName,
+            observations: observations,
             proposedSessions: sessions.map(({ id, ...rest }) => rest) 
         });
     };
@@ -154,6 +157,17 @@ const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, o
                      <button onClick={handleAddSession} className="w-full border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 font-semibold py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
                         <PlusIcon className="inline w-5 h-5 mr-2"/>Añadir Sesión
                     </button>
+                    <div className="mt-4">
+                        <label htmlFor="observations" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Observaciones Adicionales</label>
+                        <textarea 
+                            id="observations"
+                            value={observations} 
+                            onChange={e => setObservations(e.target.value)}
+                            rows={3}
+                            className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white"
+                            placeholder="Añadir notas para el paciente o de uso interno..."
+                        />
+                    </div>
                      <div className="mt-6 p-4 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                         <div className="flex justify-between font-bold text-xl text-gray-900 dark:text-gray-100">
                             <span>Total del Presupuesto:</span>
@@ -394,6 +408,12 @@ const BudgetCard: React.FC<{ budget: Budget; findings: ClinicalFinding[]; treatm
             </div>
             {isOpen && (
                 <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                    {budget.observations && (
+                         <div className="mb-4">
+                            <h5 className="font-semibold text-sm text-slate-600 dark:text-slate-400">Observaciones</h5>
+                            <p className="text-sm text-slate-500 dark:text-slate-300 whitespace-pre-wrap p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md mt-1">{budget.observations}</p>
+                        </div>
+                    )}
                     {budget.proposedSessions.map(session => (
                         <div key={session.id} className="mb-2">
                             <p className="font-semibold text-slate-700 dark:text-slate-300">{session.name}</p>

@@ -113,6 +113,14 @@ export const BudgetToPrint = React.forwardRef<HTMLDivElement, BudgetToPrintProps
                     </table>
                 </main>
 
+                 {/* Observations */}
+                {budget.observations && (
+                    <section className="mt-8">
+                        <h4 className="font-semibold uppercase tracking-wider mb-2 text-slate-600 text-xs">Observaciones Adicionales</h4>
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap p-4 bg-slate-50 border rounded-lg">{budget.observations}</p>
+                    </section>
+                )}
+
                 {/* Financial Summary & Footer */}
                 <footer className="mt-auto pt-8">
                     <div className="flex justify-end">

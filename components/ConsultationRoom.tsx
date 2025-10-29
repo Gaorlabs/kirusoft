@@ -1,6 +1,6 @@
 
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Odontogram } from './Odontogram';
 import { Toolbar } from './Toolbar';
 import { TreatmentPlan } from './TreatmentPlan';
@@ -15,10 +15,15 @@ import { Prescriptions } from './Prescriptions';
 import { Consents } from './Consents';
 import { Accounts } from './Accounts';
 import { BudgetToPrint } from './BudgetToPrint';
+import { PrescriptionToPrint } from './PrescriptionToPrint';
+import { ConsentToPrint } from './ConsentToPrint';
+import { PaymentReceiptToPrint } from './PaymentReceiptToPrint';
+
 
 type OdontogramType = 'permanent' | 'deciduous';
 type Theme = 'light' | 'dark';
 type MainView = 'odontogram' | 'plan' | 'history' | 'prescriptions' | 'consents' | 'accounts';
+type DocumentType = 'budget' | 'prescription' | 'consent' | 'paymentReceipt' | 'accountStatement';
 
 interface ConsultationRoomProps {
     patient: Appointment;
@@ -34,10 +39,26 @@ interface ConsultationRoomProps {
     doctors: Doctor[];
     settings: AppSettings;
     treatments: DentalTreatment[];
+    onSendToWhatsapp: (patient: Appointment, htmlContent: string, documentType: string) => Promise<boolean>;
 }
 
 
-export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToAdmin, onNavigateToPatient, isFirstPatient, isLastPatient, onSavePayment, onDeletePayment, initialTab, doctors, settings, treatments }: ConsultationRoomProps) {
+export function ConsultationRoom({ 
+    patient, 
+    patientRecord, 
+    onSave, 
+    onNavigateToAdmin, 
+    onNavigateToPatient, 
+    isFirstPatient, 
+    isLastPatient, 
+    onSavePayment, 
+    onDeletePayment, 
+    initialTab, 
+    doctors, 
+    settings, 
+    treatments,
+    onSendToWhatsapp
+}: ConsultationRoomProps) {
     const [record, setRecord] = useState(patientRecord);
     const [theme, setTheme] = useState<Theme>('dark');
     const [activeView, setActiveView] = useState<MainView>(initialTab || 'odontogram');
@@ -45,8 +66,9 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
     const [activeTooth, setActiveTooth] = useState<{ toothId: number; surface: ToothSurfaceName | 'whole' } | null>(null);
     const [isTreatmentModalOpen, setIsTreatmentModalOpen] = useState(false);
     const [editingFinding, setEditingFinding] = useState<ClinicalFinding | null>(null);
-    const [budgetToPrint, setBudgetToPrint] = useState<Budget | null>(null);
-    const printRef = React.useRef<HTMLDivElement>(null);
+
+    const [documentToAction, setDocumentToAction] = useState<{ type: string, item: any } | null>(null);
+    const [isSending, setIsSending] = useState(false);
     
     const treatmentsMap = useMemo(() => 
         treatments.reduce((acc, treatment) => {
@@ -64,29 +86,116 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
         document.documentElement.classList.remove('dark', 'light');
         document.documentElement.classList.add(theme);
     }, [theme]);
-
-    useEffect(() => {
-        if (budgetToPrint && printRef.current) {
-            const printContent = printRef.current;
-            const winPrint = window.open('', '', 'width=900,height=650');
-            if (winPrint) {
-                winPrint.document.write('<html><head><title>Presupuesto</title>');
-                winPrint.document.write('<script src="https://cdn.tailwindcss.com"></script>');
-                winPrint.document.write('<style>@media print { @page { size: A4; margin: 0; } body { -webkit-print-color-adjust: exact; } }</style>');
-                winPrint.document.write('</head><body>');
-                winPrint.document.write(printContent.innerHTML);
-                winPrint.document.write('</body></html>');
-                winPrint.document.close();
-                winPrint.focus();
-                setTimeout(() => {
-                    winPrint.print();
-                    winPrint.close();
-                    setBudgetToPrint(null);
-                }, 500);
-            }
-        }
-    }, [budgetToPrint]);
     
+    const allFindings = useMemo(() => {
+        const permanentFindings = Object.values(record.permanentOdontogram).flatMap((tooth: ToothState) => tooth.findings);
+        const deciduousFindings = Object.values(record.deciduousOdontogram).flatMap((tooth: ToothState) => tooth.findings);
+        return [...permanentFindings, ...deciduousFindings];
+    }, [record.permanentOdontogram, record.deciduousOdontogram]);
+
+    // This effect handles both printing and sending to WhatsApp
+    useEffect(() => {
+        const performDocumentAction = async () => {
+            if (!documentToAction) return;
+
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            document.body.appendChild(tempDiv);
+            
+            const root = createRoot(tempDiv);
+            
+            try {
+                const { type, item } = documentToAction;
+                const isSendAction = type.startsWith('send_');
+                const actionType = isSendAction ? type.substring(5) : type;
+
+                let documentTitle = '';
+                let elementToRender;
+
+                switch (actionType) {
+                    case 'budget':
+                        documentTitle = `Presupuesto - ${patient.name}`;
+                        elementToRender = <BudgetToPrint budget={item} patientName={patient.name} findings={allFindings} doctors={doctors} settings={settings} treatments={treatments} />;
+                        break;
+                    case 'prescription':
+                         documentTitle = `Receta - ${patient.name}`;
+                         elementToRender = <PrescriptionToPrint prescription={item} patientName={patient.name} clinicName={settings.clinicName} doctor={doctors.find(d => d.id === item.doctorId)} />;
+                        break;
+                    case 'consent':
+                        documentTitle = `Consentimiento - ${patient.name}`;
+                        elementToRender = <ConsentToPrint consent={item} patientName={patient.name} clinicName={settings.clinicName} doctor={doctors.find(d => d.id === item.doctorId)} />;
+                        break;
+                    case 'paymentReceipt':
+                        documentTitle = `Recibo - ${patient.name}`;
+                        elementToRender = <PaymentReceiptToPrint payment={item} patientName={patient.name} clinicName={settings.clinicName} receiptNumber={item.id.slice(0,6).toUpperCase()} />;
+                        break;
+                }
+
+                if (elementToRender) {
+                    root.render(elementToRender);
+                    
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    const htmlContent = tempDiv.innerHTML;
+                    
+                    if (isSendAction) {
+                        onSendToWhatsapp(patient, htmlContent, actionType).then(success => {
+                            if (success) {
+                                alert('Documento enviado con éxito por WhatsApp.');
+                            }
+                        }).finally(() => {
+                            setIsSending(false);
+                            setDocumentToAction(null);
+                        });
+                    } else {
+                        const winPrint = window.open('', '', 'width=900,height=650');
+                        if (winPrint) {
+                            document.title = documentTitle;
+                            winPrint.document.write(`<html><head><title>${documentTitle}</title><script src="https://cdn.tailwindcss.com"></script><style>@media print { @page { size: A4; margin: 0; } body { -webkit-print-color-adjust: exact; } }</style></head><body>`);
+                            winPrint.document.write(htmlContent);
+                            winPrint.document.write('</body></html>');
+                            winPrint.document.close();
+                            winPrint.focus();
+                            setTimeout(() => {
+                                winPrint.print();
+                                winPrint.close();
+                                document.title = 'Kiru Consultorio Dental';
+                                setDocumentToAction(null);
+                            }, 500);
+                        } else {
+                            setDocumentToAction(null);
+                        }
+                    }
+                } else {
+                    setDocumentToAction(null);
+                    setIsSending(false);
+                }
+            } finally {
+                // Cleanup
+                root.unmount();
+                if (tempDiv.parentNode) {
+                    document.body.removeChild(tempDiv);
+                }
+            }
+        };
+        
+        performDocumentAction();
+    }, [documentToAction, patient, allFindings, doctors, settings, treatments, onSendToWhatsapp]);
+
+    const handleDocumentAction = (action: 'print' | 'send', type: DocumentType, item: any) => {
+        if (action === 'send') {
+             if (!settings.n8nWebhookUrl) {
+                alert("La URL del webhook de n8n no está configurada. Por favor, configúrela en el panel de administración en la pestaña de 'Configuración'.");
+                return;
+            }
+            setIsSending(true);
+            setDocumentToAction({ type: `send_${type}`, item });
+        } else {
+            setDocumentToAction({ type, item });
+        }
+    };
+
     const isPermanent = odontogramType === 'permanent';
     const odontogramState = isPermanent ? record.permanentOdontogram : record.deciduousOdontogram;
     
@@ -100,12 +209,6 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
             }
         });
     };
-
-    const allFindings = useMemo(() => {
-        const permanentFindings = Object.values(record.permanentOdontogram).flatMap((tooth: ToothState) => tooth.findings);
-        const deciduousFindings = Object.values(record.deciduousOdontogram).flatMap((tooth: ToothState) => tooth.findings);
-        return [...permanentFindings, ...deciduousFindings];
-    }, [record.permanentOdontogram, record.deciduousOdontogram]);
 
     const allCompletedTreatments = useMemo(() => {
         return record.sessions
@@ -572,11 +675,11 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                                 </div>
                             </div>
                         )}
-                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveOrUpdateBudget={handleSaveOrUpdateBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} onUpdateBudget={handleUpdateBudget} onPrintBudget={setBudgetToPrint} treatments={treatments} />}
+                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveOrUpdateBudget={handleSaveOrUpdateBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} onUpdateBudget={handleUpdateBudget} onPrintBudget={(budget) => handleDocumentAction('print', 'budget', budget)} treatments={treatments} />}
                          {activeView === 'history' && <ClinicalHistory sessions={record.sessions} onUpdateSession={handleUpdateSession} treatments={treatments} />}
-                         {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} doctors={doctors} treatments={allCompletedTreatments} />}
-                         {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} patientName={patient.name} doctors={doctors} />}
-                         {activeView === 'accounts' && <Accounts sessions={record.sessions} patientId={record.patientId} payments={record.payments} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} patientName={patient.name} treatments={treatments}/>}
+                         {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} doctors={doctors} treatments={allCompletedTreatments} onAction={handleDocumentAction} isSending={isSending} />}
+                         {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} patientName={patient.name} doctors={doctors} onAction={handleDocumentAction} isSending={isSending} />}
+                         {activeView === 'accounts' && <Accounts sessions={record.sessions} patientId={record.patientId} payments={record.payments} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} patientName={patient.name} treatments={treatments} onAction={handleDocumentAction} isSending={isSending}/>}
                     </div>
                 </main>
 
@@ -589,20 +692,6 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                             setEditingFinding(null);
                         }}
                         onSelectTreatment={handleSelectTreatmentFromModal}
-                        treatments={treatments}
-                    />
-                )}
-            </div>
-
-            <div className="hidden">
-                {budgetToPrint && (
-                    <BudgetToPrint 
-                        ref={printRef}
-                        budget={budgetToPrint}
-                        patientName={patient.name}
-                        findings={allFindings}
-                        doctors={doctors}
-                        settings={settings}
                         treatments={treatments}
                     />
                 )}

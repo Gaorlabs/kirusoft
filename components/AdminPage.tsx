@@ -1,10 +1,11 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment, Budget, ClinicalFinding, DentalTreatment, TreatmentApplication } from '../types';
+// FIX: Added 'ToothState' to imports for type safety in data transformations.
+import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment, Budget, ClinicalFinding, DentalTreatment, TreatmentApplication, ToothState } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENT_CATEGORIES } from '../constants';
 import {
-    DashboardIcon, AppointmentIcon, UsersIcon, MegaphoneIcon, SettingsIcon, PlusIcon, PencilIcon, TrashIcon, BriefcaseIcon, DentalIcon, MoonIcon, SunIcon, OdontogramIcon, ChevronDownIcon, CalendarIcon, WhatsappIcon, DollarSignIcon
+    DashboardIcon, AppointmentIcon, UsersIcon, MegaphoneIcon, SettingsIcon, PlusIcon, PencilIcon, TrashIcon, BriefcaseIcon, DentalIcon, MoonIcon, SunIcon, OdontogramIcon, ChevronDownIcon, CalendarIcon, WhatsappIcon, DollarSignIcon, SaveIcon
 } from './icons';
 import { AdminAppointmentModal } from './AdminAppointmentModal';
 import { AdminDoctorModal } from './AdminDoctorModal';
@@ -15,7 +16,7 @@ import { AdminPaymentModal } from './AdminPaymentModal';
 import { AdminTreatmentModal } from './AdminTreatmentModal';
 
 
-type AdminTab = 'dashboard' | 'agenda' | 'patients' | 'doctors' | 'promotions' | 'settings' | 'accounts' | 'services';
+type AdminTab = 'dashboard' | 'agenda' | 'patients' | 'doctors' | 'promotions' | 'settings' | 'accounts' | 'services' | 'cotizaciones';
 type MainView = 'odontogram' | 'plan' | 'history' | 'prescriptions' | 'consents' | 'accounts';
 
 type Theme = 'light' | 'dark';
@@ -36,6 +37,7 @@ interface AdminPageProps {
     onTogglePromotionStatus: (id: string) => void;
     onSaveTreatment: (data: Omit<DentalTreatment, 'icon'> & { id?: string; }) => void;
     onDeleteTreatment: (id: string) => void;
+    onUpdateBudget: (patientId: string, budgetId: string, data: Partial<Budget>) => void;
     setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
     onLogout: () => void;
     onOpenClinicalRecord: (patient: Appointment, targetTab?: MainView) => void;
@@ -159,6 +161,138 @@ const AdminAccountsView: React.FC<{
     );
 };
 
+const AdminBudgetsView: React.FC<{
+    patientRecords: Record<string, PatientRecord>;
+    appointments: Appointment[];
+    treatments: DentalTreatment[];
+    onUpdateBudget: (patientId: string, budgetId: string, data: Partial<Budget>) => void;
+}> = ({ patientRecords, appointments, treatments, onUpdateBudget }) => {
+    
+    const [editingBudget, setEditingBudget] = useState<{ id: string; patientId: string; status: Budget['status']; followUpDate: string } | null>(null);
+
+    const treatmentsMap = useMemo(() => treatments.reduce((acc, treatment) => ({ ...acc, [treatment.id]: treatment }), {} as Record<string, DentalTreatment>), [treatments]);
+
+    const allBudgets = useMemo(() => {
+        const patientMap = appointments.reduce((acc, app) => ({ ...acc, [app.id]: app }), {} as Record<string, Appointment>);
+        
+        // FIX: Added explicit types for 'record' and 'tooth' to resolve 'Property does not exist on type unknown' errors.
+        const allFindings = Object.values(patientRecords).flatMap((record: PatientRecord) => [
+            ...Object.values(record.permanentOdontogram).flatMap((tooth: ToothState) => tooth.findings),
+            ...Object.values(record.deciduousOdontogram).flatMap((tooth: ToothState) => tooth.findings)
+        ]);
+        const findingsMap = allFindings.reduce((acc, f) => ({ ...acc, [f.id]: f }), {} as Record<string, ClinicalFinding>);
+
+        // FIX: Added explicit type for 'record' to resolve 'Property does not exist on type unknown' errors.
+        return Object.values(patientRecords).flatMap((record: PatientRecord) =>
+            (record.budgets || []).map(budget => {
+                const total = budget.proposedSessions.flatMap(s => s.findingIds).reduce((acc, findingId) => {
+                    const finding = findingsMap[findingId];
+                    return acc + (finding ? treatmentsMap[finding.condition]?.price || 0 : 0);
+                }, 0);
+                
+                return {
+                    ...budget,
+                    patientId: record.patientId,
+                    patientName: patientMap[record.patientId]?.name || 'N/A',
+                    total,
+                };
+            })
+        ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [patientRecords, appointments, treatmentsMap]);
+
+    const handleEditClick = (budget: typeof allBudgets[0]) => {
+        setEditingBudget({
+            id: budget.id,
+            patientId: budget.patientId,
+            status: budget.status,
+            followUpDate: budget.followUpDate ? new Date(budget.followUpDate).toISOString().slice(0, 10) : '',
+        });
+    };
+
+    const handleSaveEdit = () => {
+        if (editingBudget) {
+            onUpdateBudget(editingBudget.patientId, editingBudget.id, {
+                status: editingBudget.status,
+                followUpDate: editingBudget.followUpDate ? new Date(editingBudget.followUpDate).toISOString() : undefined,
+            });
+            setEditingBudget(null);
+        }
+    };
+    
+    const handleEditingChange = (field: 'status' | 'followUpDate', value: string) => {
+        if (editingBudget) {
+            setEditingBudget(prev => ({ ...prev!, [field]: value }));
+        }
+    };
+
+    const statusConfig: Record<Budget['status'], { text: string; bg: string; text_color: string; }> = {
+        proposed: { text: 'Propuesto', bg: 'bg-yellow-100 dark:bg-yellow-900/40', text_color: 'text-yellow-800 dark:text-yellow-300' },
+        accepted: { text: 'Aceptado', bg: 'bg-green-100 dark:bg-green-900/40', text_color: 'text-green-800 dark:text-green-300' },
+        rejected: { text: 'Rechazado', bg: 'bg-red-100 dark:bg-red-900/40', text_color: 'text-red-800 dark:text-red-300' },
+    };
+
+    return (
+        <div>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Gestión de Cotizaciones</h2>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-x-auto border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
+                     <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700">
+                        <tr>
+                            <th className="px-4 py-3">Paciente</th>
+                            <th className="px-4 py-3">Nombre Cotización</th>
+                            <th className="px-4 py-3">Estado</th>
+                            <th className="px-4 py-3 text-right">Monto</th>
+                            <th className="px-4 py-3">Fecha Seguimiento</th>
+                            <th className="px-4 py-3 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {allBudgets.map(budget => {
+                            const isEditing = editingBudget?.id === budget.id;
+                            return (
+                                <tr key={budget.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                    <td className="px-4 py-2 font-medium text-slate-900 dark:text-white">{budget.patientName}</td>
+                                    <td className="px-4 py-2">{budget.name}</td>
+                                    <td className="px-4 py-2">
+                                        {isEditing ? (
+                                            <select value={editingBudget!.status} onChange={e => handleEditingChange('status', e.target.value)} className="p-1 text-xs rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600">
+                                                <option value="proposed">Propuesto</option>
+                                                <option value="accepted">Aceptado</option>
+                                                <option value="rejected">Rechazado</option>
+                                            </select>
+                                        ) : (
+                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusConfig[budget.status].bg} ${statusConfig[budget.status].text_color}`}>{statusConfig[budget.status].text}</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-2 text-right font-semibold">S/ {budget.total.toFixed(2)}</td>
+                                    <td className="px-4 py-2">
+                                        {isEditing ? (
+                                            <input type="date" value={editingBudget!.followUpDate} onChange={e => handleEditingChange('followUpDate', e.target.value)} className="p-1 text-xs rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600"/>
+                                        ) : (
+                                            budget.followUpDate ? new Date(budget.followUpDate).toLocaleDateString() : 'N/A'
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-2 text-center">
+                                        {isEditing ? (
+                                            <div className="flex items-center justify-center space-x-2">
+                                                <button onClick={handleSaveEdit} className="p-1.5 text-green-500 hover:bg-green-100 rounded-full"><SaveIcon className="w-5 h-5"/></button>
+                                                <button onClick={() => setEditingBudget(null)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-full"><TrashIcon className="w-5 h-5"/></button>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => handleEditClick(budget)} className="p-1.5 text-yellow-500 hover:bg-yellow-100 dark:hover:bg-slate-600 rounded-full"><PencilIcon className="w-5 h-5"/></button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+
 const AdminDashboardView: React.FC<{
     appointments: Appointment[];
     patientRecords: Record<string, PatientRecord>;
@@ -175,9 +309,10 @@ const AdminDashboardView: React.FC<{
     [treatments]);
 
     const allFindings = useMemo(() => {
+        // FIX: Added explicit types for 'record' and 'tooth' to resolve 'Property does not exist on type unknown' errors.
         return Object.values(patientRecords).flatMap((record: PatientRecord) => {
-            const permanentFindings = Object.values(record.permanentOdontogram).flatMap(tooth => tooth.findings);
-            const deciduousFindings = Object.values(record.deciduousOdontogram).flatMap(tooth => tooth.findings);
+            const permanentFindings = Object.values(record.permanentOdontogram).flatMap((tooth: ToothState) => tooth.findings);
+            const deciduousFindings = Object.values(record.deciduousOdontogram).flatMap((tooth: ToothState) => tooth.findings);
             return [...permanentFindings, ...deciduousFindings];
         });
     }, [patientRecords]);
@@ -862,6 +997,13 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                     treatments={props.treatments}
                     onOpenClinicalRecord={props.onOpenClinicalRecord}
                 />;
+            case 'cotizaciones':
+                return <AdminBudgetsView
+                    patientRecords={props.patientRecords}
+                    appointments={props.appointments}
+                    treatments={props.treatments}
+                    onUpdateBudget={props.onUpdateBudget}
+                />;
             case 'services':
                 return <AdminTreatmentsView 
                     treatments={props.treatments} 
@@ -938,6 +1080,13 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                                     <input type="text" name="whatsappNumber" id="whatsappNumber" value={localSettings.whatsappNumber} onChange={handleSettingsChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
                                 </div>
 
+                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">Integraciones</h3>
+                                <div>
+                                    <label htmlFor="n8nWebhookUrl" className="block text-sm font-medium text-slate-700 dark:text-slate-300">URL de Webhook n8n</label>
+                                    <input type="text" name="n8nWebhookUrl" id="n8nWebhookUrl" value={localSettings.n8nWebhookUrl} onChange={handleSettingsChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Pega aquí la URL del webhook de n8n para activar el envío de documentos por WhatsApp.</p>
+                                </div>
+
                                 <div className="pt-2 text-right">
                                      <button type="submit" className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-6 rounded-lg">Guardar Cambios</button>
                                 </div>
@@ -963,6 +1112,7 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                     <TabButton icon={<UsersIcon />} label="Doctores" isActive={activeTab === 'doctors'} onClick={() => setActiveTab('doctors')} />
                     <TabButton icon={<MegaphoneIcon />} label="Promociones" isActive={activeTab === 'promotions'} onClick={() => setActiveTab('promotions')} />
                     <TabButton icon={<DollarSignIcon />} label="Finanzas" isActive={activeTab === 'accounts'} onClick={() => setActiveTab('accounts')} />
+                    <TabButton icon={<BriefcaseIcon />} label="Cotizaciones" isActive={activeTab === 'cotizaciones'} onClick={() => setActiveTab('cotizaciones')} />
                     <TabButton icon={<DentalIcon />} label="Servicios" isActive={activeTab === 'services'} onClick={() => setActiveTab('services')} />
                     <TabButton icon={<SettingsIcon />} label="Configuración" isActive={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
                 </nav>

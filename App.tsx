@@ -5,7 +5,7 @@ import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { AdminPage } from './components/AdminPage';
 import { ConsultationRoom } from './components/ConsultationRoom';
-import type { Appointment, Doctor, Promotion, AppSettings, PatientRecord, OdontogramState, Payment, MedicalHistory, DentalTreatment } from './types';
+import type { Appointment, Doctor, Promotion, AppSettings, PatientRecord, OdontogramState, Payment, MedicalHistory, DentalTreatment, Budget } from './types';
 import { DENTAL_SERVICES_MAP, ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, INITIAL_DENTAL_TREATMENTS } from './constants';
 import { PaymentModal } from './components/PaymentModal';
 import { AppointmentForm } from './components/AppointmentForm';
@@ -74,6 +74,7 @@ const MOCK_SETTINGS: AppSettings = {
         phoneNumber: '912345678',
     },
     whatsappNumber: '51987654321',
+    n8nWebhookUrl: '',
 };
 
 const MOCK_PATIENT_RECORDS: Record<string, PatientRecord> = {
@@ -429,6 +430,53 @@ function App() {
             setTreatments(prev => prev.filter(t => t.id !== id));
         }
     };
+
+    const handleSendToWhatsapp = async (patient: Appointment, htmlContent: string, documentType: string): Promise<boolean> => {
+        if (!settings.n8nWebhookUrl) {
+            alert("La URL del webhook de n8n no está configurada. Por favor, configúrela en el panel de administración.");
+            return false;
+        }
+
+        try {
+            const response = await fetch(settings.n8nWebhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    htmlContent,
+                    patientName: patient.name,
+                    patientPhone: patient.phone,
+                    documentType,
+                }),
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error del servidor: ${response.statusText}`);
+            }
+            
+            console.log("Enviado a n8n con éxito", await response.json());
+            return true;
+        } catch (error) {
+            console.error("Error al enviar a n8n:", error);
+            alert(`Error al enviar el documento: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+            return false;
+        }
+    };
+
+    const handleUpdateBudget = (patientId: string, budgetId: string, data: Partial<Budget>) => {
+        setPatientRecords(prev => {
+            const newRecords = structuredClone(prev);
+            const patientRecord = newRecords[patientId];
+            if (patientRecord?.budgets) {
+                const budgetIndex = patientRecord.budgets.findIndex(b => b.id === budgetId);
+                if (budgetIndex > -1) {
+                    patientRecord.budgets[budgetIndex] = { ...patientRecord.budgets[budgetIndex], ...data };
+                }
+            }
+            return newRecords;
+        });
+    };
     
     const activePromotion = promotions.find(p => p.isActive) || null;
 
@@ -452,6 +500,7 @@ function App() {
                 onTogglePromotionStatus={togglePromotionStatus}
                 onSaveTreatment={handleSaveTreatment}
                 onDeleteTreatment={handleDeleteTreatment}
+                onUpdateBudget={handleUpdateBudget}
                 setSettings={setSettings}
                 onLogout={handleLogout}
                 onOpenClinicalRecord={handleOpenClinicalRecord}
@@ -473,6 +522,7 @@ function App() {
                 doctors={doctors}
                 settings={settings}
                 treatments={treatments}
+                onSendToWhatsapp={handleSendToWhatsapp}
             />
         );
     } else if (page === 'consultation' && isAuthenticated && currentPatientIndex !== null && !currentPatientRecord) {

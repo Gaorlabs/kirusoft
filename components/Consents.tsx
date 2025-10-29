@@ -2,68 +2,8 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { ConsentForm, Doctor } from '../types';
-import { PlusIcon, CloseIcon, CheckIcon, PencilIcon, PrintIcon, DentalIcon } from './icons';
+import { PlusIcon, CloseIcon, CheckIcon, PencilIcon, PrintIcon, DentalIcon, WhatsappIcon } from './icons';
 import { CONSENT_TEMPLATES } from '../constants';
-
-// --- PRINTABLE COMPONENT ---
-const ConsentToPrint = React.forwardRef<HTMLDivElement, { consent: ConsentForm; clinicName: string; patientName: string; doctor?: Doctor }>(({ consent, clinicName, patientName, doctor }, ref) => {
-    const getFormattedContent = () => {
-        return consent.content
-            .replace(/\[PACIENTE\]/g, patientName)
-            .replace(/\[FECHA\]/g, consent.dateSigned ? new Date(consent.dateSigned).toLocaleDateString('es-ES') : new Date().toLocaleDateString('es-ES'));
-    };
-
-    return (
-        <div ref={ref} className="bg-white h-full flex flex-col font-sans text-slate-900 text-sm">
-            {/* Header */}
-            <header className="bg-blue-600 text-white p-6 flex justify-between items-center">
-                <div className="flex items-center space-x-3">
-                    <DentalIcon className="w-12 h-12" />
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">{clinicName} Dental</h1>
-                        <p className="text-sm text-blue-200">Consentimiento Informado</p>
-                    </div>
-                </div>
-                {doctor && (
-                    <div className="text-right text-sm">
-                        <p className="font-bold text-lg">{doctor.name}</p>
-                        <p>{doctor.specialty}</p>
-                        <p>{doctor.licenseNumber}</p>
-                    </div>
-                )}
-            </header>
-
-            {/* Patient Info */}
-            <section className="p-6 bg-slate-50 border-b border-slate-200">
-                <h2 className="text-xl font-bold text-slate-800 mb-4">{consent.title}</h2>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <p className="text-slate-500 font-semibold uppercase tracking-wider">Paciente</p>
-                        <p className="font-bold text-slate-800 text-base">{patientName}</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-slate-500 font-semibold uppercase tracking-wider">Fecha de Firma</p>
-                        <p className="font-bold text-slate-800 text-base">{consent.dateSigned ? new Date(consent.dateSigned).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}</p>
-                    </div>
-                </div>
-            </section>
-            
-            {/* Body */}
-            <main className="flex-1 p-6 space-y-8">
-                <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{getFormattedContent()}</p>
-            </main>
-
-            {/* Footer */}
-            <footer className="p-6 mt-auto text-left">
-                 <p className="font-semibold text-slate-600 mb-2">Firma del Paciente:</p>
-                <div className="border-t-2 border-slate-300 max-w-xs pt-2 bg-slate-50 p-2 rounded-md">
-                    {consent.signatureDataUrl && <img src={consent.signatureDataUrl} alt="Firma del paciente" className="h-20" />}
-                </div>
-            </footer>
-        </div>
-    );
-});
-
 
 // --- ADD NEW CONSENT MODAL ---
 interface ConsentModalProps {
@@ -241,12 +181,13 @@ const ConsentSigningModal: React.FC<ConsentSigningModalProps> = ({ consent, onCl
 };
 
 // --- VIEW SIGNED MODAL ---
-const ConsentViewModal: React.FC<{ consent: ConsentForm; onClose: () => void; patientName: string; onPrint: () => void; }> = ({ consent, onClose, patientName, onPrint }) => {
-    const getFormattedContent = () => {
-        return consent.content
-            .replace(/\[PACIENTE\]/g, patientName)
-            .replace(/\[FECHA\]/g, consent.dateSigned ? new Date(consent.dateSigned).toLocaleDateString('es-ES') : '');
-    };
+const ConsentViewModal: React.FC<{ 
+    consent: ConsentForm; 
+    onClose: () => void; 
+    onAction: (action: 'print' | 'send', type: 'consent', item: ConsentForm) => void;
+    isSending: boolean;
+}> = ({ consent, onClose, onAction, isSending }) => {
+    
     return (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col">
@@ -256,7 +197,7 @@ const ConsentViewModal: React.FC<{ consent: ConsentForm; onClose: () => void; pa
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                        <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{getFormattedContent()}</p>
+                        <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{consent.content}</p>
                     </div>
                     <div>
                         <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Firma registrada:</p>
@@ -266,10 +207,16 @@ const ConsentViewModal: React.FC<{ consent: ConsentForm; onClose: () => void; pa
                     </div>
                 </div>
                 <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between">
-                     <button type="button" onClick={onPrint} className="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 font-semibold flex items-center space-x-2">
-                        <PrintIcon className="w-4 h-4"/>
-                        <span>Imprimir / Descargar</span>
-                    </button>
+                     <div className="flex space-x-2">
+                        <button type="button" onClick={() => onAction('print', 'consent', consent)} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg flex items-center space-x-2">
+                            <PrintIcon className="w-4 h-4"/>
+                            <span>Imprimir / Descargar</span>
+                        </button>
+                         <button onClick={() => onAction('send', 'consent', consent)} disabled={isSending} className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg disabled:bg-slate-400 disabled:cursor-not-allowed" title="Enviar por WhatsApp">
+                            <WhatsappIcon className="w-4 h-4"/> 
+                            <span>{isSending ? 'Enviando...' : 'Enviar'}</span>
+                        </button>
+                    </div>
                     <button type="button" onClick={onClose} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 py-2 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold">Cerrar</button>
                 </div>
             </div>
@@ -284,14 +231,14 @@ interface ConsentsProps {
     onUpdate: (consents: ConsentForm[]) => void;
     patientName: string;
     doctors: Doctor[];
+    onAction: (action: 'print' | 'send', type: 'consent', item: ConsentForm) => void;
+    isSending: boolean;
 }
 
-export const Consents: React.FC<ConsentsProps> = ({ consents, onUpdate, patientName, doctors }) => {
+export const Consents: React.FC<ConsentsProps> = ({ consents, onUpdate, patientName, doctors, onAction, isSending }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [signingConsent, setSigningConsent] = useState<ConsentForm | null>(null);
     const [viewingConsent, setViewingConsent] = useState<ConsentForm | null>(null);
-    const [consentToPrint, setConsentToPrint] = useState<ConsentForm | null>(null);
-    const printRef = useRef<HTMLDivElement>(null);
     
     const doctorsMap = useMemo(() => doctors.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {} as Record<string, Doctor>), [doctors]);
 
@@ -317,28 +264,6 @@ export const Consents: React.FC<ConsentsProps> = ({ consents, onUpdate, patientN
         setSigningConsent(null);
     };
     
-    useEffect(() => {
-        if (consentToPrint && printRef.current) {
-            const printContent = printRef.current;
-            const winPrint = window.open('', '', 'width=900,height=650');
-            if (winPrint) {
-                winPrint.document.write('<html><head><title>Consentimiento</title>');
-                winPrint.document.write('<script src="https://cdn.tailwindcss.com"></script>');
-                winPrint.document.write('<style>@media print { @page { size: A4; margin: 0; } body { -webkit-print-color-adjust: exact; } }</style>');
-                winPrint.document.write('</head><body>');
-                winPrint.document.write(printContent.innerHTML);
-                winPrint.document.write('</body></html>');
-                winPrint.document.close();
-                winPrint.focus();
-                setTimeout(() => {
-                    winPrint.print();
-                    winPrint.close();
-                    setConsentToPrint(null);
-                }, 500);
-            }
-        }
-    }, [consentToPrint]);
-
     return (
         <div>
             <div className="flex justify-between items-center mb-4">
@@ -377,23 +302,9 @@ export const Consents: React.FC<ConsentsProps> = ({ consents, onUpdate, patientN
             {viewingConsent && <ConsentViewModal 
                                     consent={viewingConsent} 
                                     onClose={() => setViewingConsent(null)} 
-                                    patientName={patientName} 
-                                    onPrint={() => {
-                                        setConsentToPrint(viewingConsent);
-                                        setViewingConsent(null);
-                                    }}
+                                    onAction={onAction}
+                                    isSending={isSending}
                                 />}
-            <div className="hidden">
-                {consentToPrint && (
-                    <ConsentToPrint
-                        ref={printRef}
-                        consent={consentToPrint}
-                        clinicName="Kiru"
-                        patientName={patientName}
-                        doctor={consentToPrint.doctorId ? doctorsMap[consentToPrint.doctorId] : undefined}
-                    />
-                )}
-            </div>
         </div>
     );
 };
