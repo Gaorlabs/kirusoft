@@ -6,12 +6,12 @@ export type ToothSurfaceName = 'buccal' | 'lingual' | 'occlusal' | 'distal' | 'm
 export type TreatmentStatus = 'proposed' | 'completed';
 export type TreatmentApplication = 'surface' | 'whole_tooth' | 'root';
 
-// FIX: Added new treatment IDs to the type definitions to resolve type errors in `constants.tsx`.
-export type ToothCondition = 'caries' | 'filling' | 'endodontics' | 'crown' | 'implant' | 'sealant' | 'pulpotomy' | 'post-and-core' | 'fractura' | 'remanente-radicular' | 'restauracion-temporal' | 'corona-temporal';
-export type WholeToothCondition = 'extraction' | 'missing' | 'unerupted' | 'removable-prosthesis';
+// Allow for dynamic creation of treatments from the admin panel.
+export type ToothCondition = string;
+export type WholeToothCondition = string;
 
 export interface DentalTreatment {
-    id: ToothCondition | WholeToothCondition;
+    id: string;
     label: string;
     category: string;
     price: number;
@@ -21,7 +21,7 @@ export interface DentalTreatment {
 
 export interface AppliedTreatment {
     id: string;
-    treatmentId: ToothCondition | WholeToothCondition;
+    treatmentId: string;
     toothId: number;
     surface: ToothSurfaceName | 'whole';
     status: TreatmentStatus;
@@ -32,7 +32,7 @@ export interface ClinicalFinding {
     id: string;
     toothId: number;
     surface: ToothSurfaceName | 'whole';
-    condition: ToothCondition | WholeToothCondition;
+    condition: string;
 }
 
 export interface ToothState {
@@ -207,4 +207,10 @@ export interface AdminPaymentModalProps {
     patients: { id: string; name: string }[];
     onClose: () => void;
     onSave: (paymentData: { patientId: string; amount: number; method: string; date: string; id?: string }) => void;
+}
+
+export interface AdminTreatmentModalProps {
+    treatment: DentalTreatment | { id?: string } | null;
+    onClose: () => void;
+    onSave: (data: Omit<DentalTreatment, 'icon'> & { id?: string; }) => void;
 }

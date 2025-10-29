@@ -4,7 +4,7 @@ import React from 'react';
 import type { DentalTreatment, AppointmentStatus } from './types';
 import { CariesIcon, CrownIcon, EndodonticsIcon, FillingIcon, HealthyIcon, ImplantIcon, MissingIcon, UneruptedIcon, ExtractionIcon, PreventionIcon, RemovableProsthesisIcon, PulpotomyIcon, PostAndCoreIcon, FractureIcon } from './components/icons';
 
-export const DENTAL_TREATMENTS: DentalTreatment[] = [
+export const INITIAL_DENTAL_TREATMENTS: DentalTreatment[] = [
     { id: 'caries', label: 'Caries', category: 'Patología', price: 80, appliesTo: 'surface', icon: <CariesIcon /> },
     { id: 'fractura', label: 'Fractura', category: 'Patología', price: 0, appliesTo: 'surface', icon: <FractureIcon /> },
     { id: 'remanente-radicular', label: 'Remanente Radicular', category: 'Patología', price: 0, appliesTo: 'root', icon: <ExtractionIcon /> },
@@ -47,12 +47,6 @@ export const TREATMENT_CATEGORIES = [
     'Cirugía',
     'Otros',
 ];
-
-export const TREATMENTS_MAP = DENTAL_TREATMENTS.reduce((acc, treatment) => {
-    acc[treatment.id] = treatment;
-    return acc;
-}, {} as Record<string, DentalTreatment>);
-
 
 export const QUADRANTS_PERMANENT = {
     UPPER_RIGHT: [18, 17, 16, 15, 14, 13, 12, 11],

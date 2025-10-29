@@ -1,17 +1,17 @@
 
-import React from 'react';
-import type { ClinicalFinding } from '../types';
-import { TREATMENTS_MAP } from '../constants';
+
+import React, { useMemo } from 'react';
+import type { ClinicalFinding, DentalTreatment } from '../types';
 import { TrashIcon, PencilIcon } from './icons';
 
 interface ClinicalFindingsProps {
     findings: ClinicalFinding[];
     onDeleteFinding: (findingId: string) => void;
     onEditFinding: (finding: ClinicalFinding) => void;
+    treatments: DentalTreatment[];
 }
 
-const FindingItem: React.FC<{ finding: ClinicalFinding; onDeleteFinding: (findingId: string) => void; onEditFinding: (finding: ClinicalFinding) => void; }> = ({ finding, onDeleteFinding, onEditFinding }) => {
-    const treatmentInfo = TREATMENTS_MAP[finding.condition];
+const FindingItem: React.FC<{ finding: ClinicalFinding; onDeleteFinding: (findingId: string) => void; onEditFinding: (finding: ClinicalFinding) => void; treatmentInfo: DentalTreatment | undefined; }> = ({ finding, onDeleteFinding, onEditFinding, treatmentInfo }) => {
     
     if (!treatmentInfo) return null;
 
@@ -38,9 +38,16 @@ const FindingItem: React.FC<{ finding: ClinicalFinding; onDeleteFinding: (findin
     );
 }
 
-export const ClinicalFindings: React.FC<ClinicalFindingsProps> = ({ findings, onDeleteFinding, onEditFinding }) => {
+export const ClinicalFindings: React.FC<ClinicalFindingsProps> = ({ findings, onDeleteFinding, onEditFinding, treatments }) => {
     const sortedFindings = [...findings].sort((a,b) => a.toothId - b.toothId);
     
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
+
     return (
         <div>
             {sortedFindings.length === 0 ? (
@@ -66,6 +73,7 @@ export const ClinicalFindings: React.FC<ClinicalFindingsProps> = ({ findings, on
                                     finding={finding}
                                     onDeleteFinding={onDeleteFinding}
                                     onEditFinding={onEditFinding}
+                                    treatmentInfo={treatmentsMap[finding.condition]}
                                 />
                             ))}
                         </tbody>

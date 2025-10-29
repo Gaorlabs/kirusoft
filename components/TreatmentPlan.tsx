@@ -1,8 +1,7 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Session, AppliedTreatment, ClinicalFinding, Budget, ProposedSession, Doctor } from '../types';
-import { TREATMENTS_MAP } from '../constants';
+import type { Session, AppliedTreatment, ClinicalFinding, Budget, ProposedSession, Doctor, DentalTreatment } from '../types';
 import { CheckIcon, UndoIcon, PlusIcon, TrashIcon, SaveIcon, CalendarIcon, ChevronDownIcon, PrintIcon, PencilIcon, ClockIcon } from './icons';
 
 interface TreatmentPlanBuilderProps {
@@ -10,13 +9,21 @@ interface TreatmentPlanBuilderProps {
     onSaveBudget: (budgetData: Partial<Budget> & { proposedSessions: Omit<ProposedSession, 'id'>[] }) => void;
     onCancel: () => void;
     doctors: Doctor[];
+    treatments: DentalTreatment[];
     budgetToEdit?: Budget | null;
 }
 
-const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, onSaveBudget, onCancel, doctors, budgetToEdit }) => {
+const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, onSaveBudget, onCancel, doctors, treatments, budgetToEdit }) => {
     const [sessions, setSessions] = useState<ProposedSession[]>([{ id: crypto.randomUUID(), name: `Sesión 1`, scheduledDate: '', findingIds: [], doctorId: doctors[0]?.id || '' }]);
     const [unassignedFindings, setUnassignedFindings] = useState<ClinicalFinding[]>(findings);
     const [budgetName, setBudgetName] = useState(`Presupuesto ${new Date().toLocaleDateString()}`);
+
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
 
     useEffect(() => {
         if (budgetToEdit) {
@@ -34,10 +41,10 @@ const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, o
         const allAssignedFindingIds = sessions.flatMap(s => s.findingIds);
         return allAssignedFindingIds.reduce((total, findingId) => {
             const finding = findings.find(f => f.id === findingId);
-            const treatment = finding ? TREATMENTS_MAP[finding.condition] : null;
+            const treatment = finding ? treatmentsMap[finding.condition] : null;
             return total + (treatment?.price || 0);
         }, 0);
-    }, [sessions, findings]);
+    }, [sessions, findings, treatmentsMap]);
 
     const handleAddSession = () => {
         const newSession: ProposedSession = {
@@ -133,7 +140,7 @@ const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, o
                             <ul className="space-y-2 min-h-[50px]">
                                 {session.findingIds.map(id => {
                                     const finding = getFindingDetails(id);
-                                    const treatment = finding ? TREATMENTS_MAP[finding.condition] : null;
+                                    const treatment = finding ? treatmentsMap[finding.condition] : null;
                                     return (
                                         <li key={id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md text-sm">
                                             <span>{treatment?.label} (Diente: {finding?.toothId})</span>
@@ -159,7 +166,7 @@ const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, o
                     <h4 className="font-semibold text-lg mb-3">Hallazgos Sin Asignar</h4>
                     <ul className="space-y-2 max-h-96 overflow-y-auto">
                         {unassignedFindings.map(finding => {
-                            const treatment = TREATMENTS_MAP[finding.condition];
+                            const treatment = treatmentsMap[finding.condition];
                             return (
                                 <li key={finding.id} className="flex justify-between items-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md text-sm">
                                     <div>
@@ -181,13 +188,13 @@ const TreatmentPlanBuilder: React.FC<TreatmentPlanBuilderProps> = ({ findings, o
     );
 };
 
-const SessionCard: React.FC<{ session: Session; onToggleTreatmentStatus: (sessionId: string, treatmentId: string) => void; }> = ({ session, onToggleTreatmentStatus }) => {
+const SessionCard: React.FC<{ session: Session; treatmentsMap: Record<string, DentalTreatment>; onToggleTreatmentStatus: (sessionId: string, treatmentId: string) => void; }> = ({ session, treatmentsMap, onToggleTreatmentStatus }) => {
     const proposedItems = session.treatments.filter(t => t.status === 'proposed');
     const completedItems = session.treatments.filter(t => t.status === 'completed');
 
     const calculateTotal = (items: AppliedTreatment[]): number => {
         return items.reduce((total, item) => {
-            const treatmentInfo = TREATMENTS_MAP[item.treatmentId];
+            const treatmentInfo = treatmentsMap[item.treatmentId];
             return total + (treatmentInfo ? treatmentInfo.price : 0);
         }, 0);
     };
@@ -205,7 +212,7 @@ const SessionCard: React.FC<{ session: Session; onToggleTreatmentStatus: (sessio
         return (
              <ul className="space-y-2">
                 {items.map((item) => {
-                    const treatmentInfo = TREATMENTS_MAP[item.treatmentId];
+                    const treatmentInfo = treatmentsMap[item.treatmentId];
                     if (!treatmentInfo) return null;
                     
                     let description = `Diente: ${item.toothId}`;
@@ -286,10 +293,10 @@ const SessionCard: React.FC<{ session: Session; onToggleTreatmentStatus: (sessio
     );
 };
 
-const TreatmentPlanDisplay: React.FC<{ sessions: Session[]; onToggleTreatmentStatus: (sessionId: string, treatmentId: string) => void }> = ({ sessions, onToggleTreatmentStatus }) => {
+const TreatmentPlanDisplay: React.FC<{ sessions: Session[]; treatmentsMap: Record<string, DentalTreatment>; onToggleTreatmentStatus: (sessionId: string, treatmentId: string) => void }> = ({ sessions, treatmentsMap, onToggleTreatmentStatus }) => {
     const grandTotal = sessions.reduce((total, session) => {
         return total + session.treatments.reduce((sessionTotal, treatment) => {
-             const treatmentInfo = TREATMENTS_MAP[treatment.treatmentId];
+             const treatmentInfo = treatmentsMap[treatment.treatmentId];
              return sessionTotal + (treatmentInfo ? treatmentInfo.price : 0);
         }, 0);
     }, 0);
@@ -303,7 +310,7 @@ const TreatmentPlanDisplay: React.FC<{ sessions: Session[]; onToggleTreatmentSta
                     <p className="text-gray-500 dark:text-gray-400">No hay un plan de tratamiento activo.</p>
                 </div>
             ) : (
-                sessions.map(session => <SessionCard key={session.id} session={session} onToggleTreatmentStatus={onToggleTreatmentStatus} />)
+                sessions.map(session => <SessionCard key={session.id} session={session} treatmentsMap={treatmentsMap} onToggleTreatmentStatus={onToggleTreatmentStatus} />)
             )}
             
             {sessions.length > 0 && (
@@ -345,16 +352,16 @@ const BudgetFollowUp: React.FC<{ budget: Budget; onUpdate: (data: Partial<Budget
     );
 };
 
-const BudgetCard: React.FC<{ budget: Budget; findings: ClinicalFinding[]; onActivateBudget: (budgetId: string) => void; onPrint: () => void; onEdit: () => void; onUpdate: (id: string, data: Partial<Budget>) => void; }> = ({ budget, findings, onActivateBudget, onPrint, onEdit, onUpdate }) => {
+const BudgetCard: React.FC<{ budget: Budget; findings: ClinicalFinding[]; treatmentsMap: Record<string, DentalTreatment>; onActivateBudget: (budgetId: string) => void; onPrint: () => void; onEdit: () => void; onUpdate: (id: string, data: Partial<Budget>) => void; }> = ({ budget, findings, treatmentsMap, onActivateBudget, onPrint, onEdit, onUpdate }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isFollowingUp, setIsFollowingUp] = useState(false);
     
     const totalCost = useMemo(() => {
         return budget.proposedSessions.flatMap(s => s.findingIds).reduce((total, findingId) => {
             const finding = findings.find(f => f.id === findingId);
-            return total + (finding ? TREATMENTS_MAP[finding.condition].price : 0);
+            return total + (finding ? treatmentsMap[finding.condition].price : 0);
         }, 0);
-    }, [budget, findings]);
+    }, [budget, findings, treatmentsMap]);
 
     const statusConfig = {
         proposed: { text: 'Propuesto', bg: 'bg-yellow-100 dark:bg-yellow-900/40', text_color: 'text-yellow-800 dark:text-yellow-300' },
@@ -379,10 +386,10 @@ const BudgetCard: React.FC<{ budget: Budget; findings: ClinicalFinding[]; onActi
                     <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusConfig[budget.status].bg} ${statusConfig[budget.status].text_color}`}>{statusConfig[budget.status].text}</span>
                 </div>
                 <div className="flex items-center space-x-1">
-                    {budget.status === 'proposed' && <button onClick={onEdit} className="p-2 text-yellow-500 hover:bg-yellow-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Editar Presupuesto"><PencilIcon className="w-4 h-4" /></button>}
-                    <button onClick={onPrint} className="p-2 text-blue-500 hover:bg-blue-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Imprimir/Descargar Presupuesto"><PrintIcon className="w-4 h-4" /></button>
-                    {budget.status === 'proposed' && <button onClick={() => setIsFollowingUp(true)} className="p-2 text-green-500 hover:bg-green-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Programar Seguimiento"><ClockIcon className="w-4 h-4" /></button>}
-                    <button onClick={() => setIsOpen(!isOpen)} title="Ver/Ocultar Detalles"><ChevronDownIcon className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button>
+                    {budget.status === 'proposed' && <button onClick={onEdit} className="p-2 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 rounded-full transition-all transform hover:scale-110 active:scale-95" title="Editar Presupuesto"><PencilIcon className="w-5 h-5" /></button>}
+                    <button onClick={onPrint} className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-full transition-all transform hover:scale-110 active:scale-95" title="Imprimir/Descargar Presupuesto"><PrintIcon className="w-5 h-5" /></button>
+                    {budget.status === 'proposed' && <button onClick={() => setIsFollowingUp(!isFollowingUp)} className="p-2 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-full transition-all transform hover:scale-110 active:scale-95" title="Programar Seguimiento"><ClockIcon className="w-5 h-5" /></button>}
+                    <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-all transform hover:scale-110 active:scale-95" title="Ver/Ocultar Detalles"><ChevronDownIcon className={`w-6 h-6 transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button>
                 </div>
             </div>
             {isOpen && (
@@ -394,7 +401,7 @@ const BudgetCard: React.FC<{ budget: Budget; findings: ClinicalFinding[]; onActi
                                 {session.findingIds.map(fid => {
                                     const f = findings.find(fin => fin.id === fid);
                                     if (!f) return null;
-                                    const t = TREATMENTS_MAP[f.condition];
+                                    const t = treatmentsMap[f.condition];
                                     return <li key={fid}>{t.label} (Diente: {f.toothId})</li>
                                 })}
                             </ul>
@@ -420,11 +427,19 @@ interface BudgetManagerProps {
     onUpdateBudget: (id: string, data: Partial<Budget>) => void;
     onPrintBudget: (budget: Budget) => void;
     doctors: Doctor[];
+    treatments: DentalTreatment[];
 }
 
-const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, findings, onSaveOrUpdateBudget, onActivateBudget, onUpdateBudget, onPrintBudget, doctors }) => {
+const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, findings, onSaveOrUpdateBudget, onActivateBudget, onUpdateBudget, onPrintBudget, doctors, treatments }) => {
     const [builderMode, setBuilderMode] = useState<'new' | 'edit' | 'closed'>('closed');
     const [budgetToEdit, setBudgetToEdit] = useState<Budget | null>(null);
+
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
 
     const handleEdit = (budget: Budget) => {
         setBudgetToEdit(budget);
@@ -443,7 +458,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, findings, onSave
     };
     
     if(builderMode !== 'closed') {
-        return <TreatmentPlanBuilder findings={findings} onSaveBudget={handleSave} onCancel={handleCancel} doctors={doctors} budgetToEdit={budgetToEdit} />
+        return <TreatmentPlanBuilder findings={findings} onSaveBudget={handleSave} onCancel={handleCancel} doctors={doctors} treatments={treatments} budgetToEdit={budgetToEdit} />
     }
 
     return (
@@ -454,7 +469,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, findings, onSave
             </div>
             {budgets.length > 0 ? (
                 <div className="space-y-4">
-                    {budgets.map(b => <BudgetCard key={b.id} budget={b} findings={findings} onActivateBudget={onActivateBudget} onPrint={() => onPrintBudget(b)} onEdit={() => handleEdit(b)} onUpdate={onUpdateBudget} />)}
+                    {budgets.map(b => <BudgetCard key={b.id} budget={b} findings={findings} treatmentsMap={treatmentsMap} onActivateBudget={onActivateBudget} onPrint={() => onPrintBudget(b)} onEdit={() => handleEdit(b)} onUpdate={onUpdateBudget} />)}
                 </div>
             ) : (
                 <div className="text-center p-6 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
@@ -476,19 +491,27 @@ interface TreatmentPlanProps {
     onUpdateBudget: (id: string, data: Partial<Budget>) => void;
     onPrintBudget: (budget: Budget) => void;
     doctors: Doctor[];
+    treatments: DentalTreatment[];
 }
 
-export const TreatmentPlan: React.FC<TreatmentPlanProps> = ({ sessions, findings, budgets, onSaveOrUpdateBudget, onActivateBudget, onToggleTreatmentStatus, onUpdateBudget, onPrintBudget, doctors }) => {
+export const TreatmentPlan: React.FC<TreatmentPlanProps> = ({ sessions, findings, budgets, onSaveOrUpdateBudget, onActivateBudget, onToggleTreatmentStatus, onUpdateBudget, onPrintBudget, doctors, treatments }) => {
     const hasActivePlan = sessions.length > 0;
     const hasBudgets = budgets.length > 0;
     const hasFindings = findings.length > 0;
 
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
+
     if (hasActivePlan) {
-        return <TreatmentPlanDisplay sessions={sessions} onToggleTreatmentStatus={onToggleTreatmentStatus} />;
+        return <TreatmentPlanDisplay sessions={sessions} treatmentsMap={treatmentsMap} onToggleTreatmentStatus={onToggleTreatmentStatus} />;
     }
 
     if (hasBudgets || hasFindings) {
-        return <BudgetManager budgets={budgets} findings={findings} onSaveOrUpdateBudget={onSaveOrUpdateBudget} onActivateBudget={onActivateBudget} onUpdateBudget={onUpdateBudget} onPrintBudget={onPrintBudget} doctors={doctors} />;
+        return <BudgetManager budgets={budgets} findings={findings} onSaveOrUpdateBudget={onSaveOrUpdateBudget} onActivateBudget={onActivateBudget} onUpdateBudget={onUpdateBudget} onPrintBudget={onPrintBudget} doctors={doctors} treatments={treatments} />;
     }
 
     return (

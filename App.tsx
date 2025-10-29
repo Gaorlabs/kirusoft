@@ -5,14 +5,13 @@ import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { AdminPage } from './components/AdminPage';
 import { ConsultationRoom } from './components/ConsultationRoom';
-// FIX: Corrected typo 'OdogramState' to 'OdontogramState'.
-import type { Appointment, Doctor, Promotion, AppSettings, PatientRecord, OdontogramState, Payment, MedicalHistory } from './types';
-import { DENTAL_SERVICES_MAP, ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS } from './constants';
+import type { Appointment, Doctor, Promotion, AppSettings, PatientRecord, OdontogramState, Payment, MedicalHistory, DentalTreatment } from './types';
+import { DENTAL_SERVICES_MAP, ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, INITIAL_DENTAL_TREATMENTS } from './constants';
 import { PaymentModal } from './components/PaymentModal';
 import { AppointmentForm } from './components/AppointmentForm';
+import { DentalIcon } from './components/icons';
 
 const initialToothState = { surfaces: { buccal: [], lingual: [], occlusal: [], distal: [], mesial: [], root: [] }, whole: [], findings: [] };
-// FIX: Corrected typo 'OdogramState' to 'OdontogramState'.
 const createInitialOdontogram = (teeth: number[]): OdontogramState => teeth.reduce((acc, toothId) => ({ ...acc, [toothId]: structuredClone(initialToothState) }), {});
 
 const initialMedicalHistory: MedicalHistory = {
@@ -48,7 +47,6 @@ const MOCK_APPOINTMENTS: Appointment[] = [
     { id: 'apt1', name: 'Juan Perez', phone: '987654321', email: 'juan.perez@email.com', dateTime: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(), service: 'orthodontics', status: 'confirmed', doctorId: 'doc1' },
     { id: 'apt2', name: 'Maria Lopez', phone: '912345678', email: 'maria.lopez@email.com', dateTime: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString(), service: 'endodontics', status: 'confirmed', doctorId: 'doc2' },
     { id: 'apt3', name: 'Pedro Ramirez', phone: '955555555', email: 'pedro.ramirez@email.com', dateTime: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), service: 'cosmetic_dentistry', status: 'completed', doctorId: 'doc1' },
-    // FIX: Corrected an appointment object that was missing the required `status` property and had an invalid `service` value. The `service` was changed to 'emergency' and `status` was set to 'waiting'.
     { id: 'apt4', name: 'Laura Sanchez', phone: '933333333', email: 'laura.s@email.com', dateTime: new Date(new Date().setDate(new Date().getDate())).toISOString(), service: 'emergency', status: 'waiting', doctorId: 'doc3' },
     { id: 'apt5', name: 'Carlos Gomez', phone: '922222222', email: 'carlos.g@email.com', dateTime: new Date(new Date().setDate(new Date().getDate() + 3)).toISOString(), service: 'restorations', status: 'requested', doctorId: undefined },
 ];
@@ -115,9 +113,11 @@ function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<Rea
       const stickyValue = window.localStorage.getItem(key);
       if (stickyValue !== null) {
         const parsedValue = JSON.parse(stickyValue);
-        // FIX: Merge the stored value with the default value.
-        // This ensures that if the data structure in localStorage is outdated (e.g., missing new keys like `yapeInfo`),
-        // the application doesn't crash when trying to access properties of undefined. It creates a more robust state initialization.
+        // Special handling for treatments to ensure icons are present
+        if (key === 'kiru-treatments' && Array.isArray(parsedValue) && Array.isArray(defaultValue)) {
+             const defaultMap = defaultValue.reduce((acc, t) => ({...acc, [t.id]: t.icon}), {} as Record<string, React.ReactNode>);
+             return parsedValue.map(t => ({ ...t, icon: defaultMap[t.id] || <DentalIcon /> })) as T;
+        }
         return { ...defaultValue, ...parsedValue };
       }
     } catch (error) {
@@ -128,7 +128,13 @@ function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<Rea
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(key, JSON.stringify(value));
+      // Don't store complex objects like icons in localStorage
+      if (key === 'kiru-treatments' && Array.isArray(value)) {
+        const storableValue = value.map(({ icon, ...rest }) => rest);
+        window.localStorage.setItem(key, JSON.stringify(storableValue));
+      } else {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      }
     } catch (error) {
       console.error(`Error setting localStorage key "${key}":`, error);
     }
@@ -152,6 +158,7 @@ function App() {
     const [promotions, setPromotions] = useStickyState<Promotion[]>(MOCK_PROMOTIONS, 'kiru-promotions');
     const [settings, setSettings] = useStickyState<AppSettings>(MOCK_SETTINGS, 'kiru-settings');
     const [patientRecords, setPatientRecords] = useStickyState<Record<string, PatientRecord>>(MOCK_PATIENT_RECORDS, 'kiru-patientRecords');
+    const [treatments, setTreatments] = useStickyState<DentalTreatment[]>(INITIAL_DENTAL_TREATMENTS, 'kiru-treatments');
     
     const [currentPatientIndex, setCurrentPatientIndex] = useState<number | null>(null);
     const [initialTabForConsultation, setInitialTabForConsultation] = useState<MainView | undefined>();
@@ -396,6 +403,33 @@ function App() {
         });
     };
     
+    const handleSaveTreatment = (data: Omit<DentalTreatment, 'icon'> & { id?: string; }) => {
+        setTreatments(prev => {
+            if (data.id) { // Editing
+                return prev.map(t => t.id === data.id ? { ...t, ...data, price: Number(data.price) } as DentalTreatment : t);
+            }
+            // Creating
+            const newId = data.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            if (prev.some(t => t.id === newId)) {
+                alert('Error: Ya existe un tratamiento con un ID similar. Por favor, elija un nombre diferente.');
+                return prev;
+            }
+            const newTreatment: DentalTreatment = {
+                ...data,
+                id: newId,
+                price: Number(data.price),
+                icon: <DentalIcon />,
+            };
+            return [...prev, newTreatment];
+        });
+    };
+
+    const handleDeleteTreatment = (id: string) => {
+        if (window.confirm('¿Está seguro de que desea eliminar este tratamiento? Afectará a futuros cálculos, pero no a los registros históricos.')) {
+            setTreatments(prev => prev.filter(t => t.id !== id));
+        }
+    };
+    
     const activePromotion = promotions.find(p => p.isActive) || null;
 
     let pageContent;
@@ -408,6 +442,7 @@ function App() {
                 promotions={promotions}
                 settings={settings}
                 patientRecords={patientRecords}
+                treatments={treatments}
                 onSaveAppointment={handleSaveAppointment}
                 onDeleteAppointment={handleDeleteAppointment}
                 onSaveDoctor={handleSaveDoctor}
@@ -415,6 +450,8 @@ function App() {
                 onSavePromotion={handleSavePromotion}
                 onDeletePromotion={handleDeletePromotion}
                 onTogglePromotionStatus={togglePromotionStatus}
+                onSaveTreatment={handleSaveTreatment}
+                onDeleteTreatment={handleDeleteTreatment}
                 setSettings={setSettings}
                 onLogout={handleLogout}
                 onOpenClinicalRecord={handleOpenClinicalRecord}
@@ -435,6 +472,7 @@ function App() {
                 initialTab={initialTabForConsultation}
                 doctors={doctors}
                 settings={settings}
+                treatments={treatments}
             />
         );
     } else if (page === 'consultation' && isAuthenticated && currentPatientIndex !== null && !currentPatientRecord) {

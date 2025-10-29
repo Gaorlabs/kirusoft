@@ -1,14 +1,15 @@
+
+
 import React, { useState, useMemo } from 'react';
-import { DENTAL_TREATMENTS, TREATMENT_CATEGORIES } from '../constants';
-// FIX: Changed import to be a relative path.
+import { TREATMENT_CATEGORIES } from '../constants';
 import type { DentalTreatment, ToothCondition, WholeToothCondition, TreatmentApplication, ToothSurfaceName } from '../types';
-// FIX: Changed import to be a relative path.
 import { ChevronDownIcon, SearchIcon, CloseIcon } from './icons';
 
 interface TreatmentSelectionModalProps {
     target: { toothId: number; surface: ToothSurfaceName | 'whole' } | null;
     onClose: () => void;
     onSelectTreatment: (id: ToothCondition | WholeToothCondition) => void;
+    treatments: DentalTreatment[];
 }
 
 const CategorySection: React.FC<{
@@ -46,7 +47,7 @@ const CategorySection: React.FC<{
 };
 
 
-export const Toolbar: React.FC<TreatmentSelectionModalProps> = ({ target, onClose, onSelectTreatment }) => {
+export const Toolbar: React.FC<TreatmentSelectionModalProps> = ({ target, onClose, onSelectTreatment, treatments }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const applicableTreatments = useMemo(() => {
@@ -61,7 +62,7 @@ export const Toolbar: React.FC<TreatmentSelectionModalProps> = ({ target, onClos
             applicableType = 'surface';
         }
 
-        let filtered = DENTAL_TREATMENTS.filter(t => t.appliesTo === applicableType);
+        let filtered = treatments.filter(t => t.appliesTo === applicableType);
 
         if (searchTerm) {
             filtered = filtered.filter(t =>
@@ -69,7 +70,7 @@ export const Toolbar: React.FC<TreatmentSelectionModalProps> = ({ target, onClos
             );
         }
         return filtered;
-    }, [target, searchTerm]);
+    }, [target, searchTerm, treatments]);
 
     const treatmentsByCategory = useMemo(() => {
         return TREATMENT_CATEGORIES.map(category => ({

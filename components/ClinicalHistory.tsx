@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import type { Session } from '../types';
+
+
+import React, { useState, useMemo } from 'react';
+import type { Session, DentalTreatment } from '../types';
 import { PencilIcon, SaveIcon, PlusIcon, TrashIcon } from './icons';
-import { TREATMENTS_MAP } from '../constants';
 
 interface SessionCardProps {
     session: Session;
     onUpdateSession: (sessionId: string, updatedData: Partial<Session>) => void;
+    treatmentsMap: Record<string, DentalTreatment>;
 }
 
-const SessionCard: React.FC<SessionCardProps> = ({ session, onUpdateSession }) => {
+const SessionCard: React.FC<SessionCardProps> = ({ session, onUpdateSession, treatmentsMap }) => {
     const [isEditingNotes, setIsEditingNotes] = useState(false);
     const [notes, setNotes] = useState(session.notes);
 
@@ -44,7 +46,7 @@ const SessionCard: React.FC<SessionCardProps> = ({ session, onUpdateSession }) =
                     {session.treatments.length > 0 ? (
                         <ul className="space-y-2">
                             {session.treatments.map(t => {
-                                const info = TREATMENTS_MAP[t.treatmentId];
+                                const info = treatmentsMap[t.treatmentId];
                                 return (
                                     <li key={t.id} className="text-sm p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                                         <p className="font-semibold text-blue-800 dark:text-blue-300">{info?.label}</p>
@@ -117,11 +119,19 @@ const SessionCard: React.FC<SessionCardProps> = ({ session, onUpdateSession }) =
 interface ClinicalHistoryProps {
     sessions: Session[];
     onUpdateSession: (sessionId: string, updatedData: Partial<Session>) => void;
+    treatments: DentalTreatment[];
 }
 
-export const ClinicalHistory: React.FC<ClinicalHistoryProps> = ({ sessions, onUpdateSession }) => {
+export const ClinicalHistory: React.FC<ClinicalHistoryProps> = ({ sessions, onUpdateSession, treatments }) => {
     const sortedSessions = [...sessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
+
     return (
         <div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-gray-200 mb-4">Historial de Sesiones</h3>
@@ -133,7 +143,7 @@ export const ClinicalHistory: React.FC<ClinicalHistoryProps> = ({ sessions, onUp
             ) : (
                 <div className="space-y-4">
                     {sortedSessions.map(session => (
-                        <SessionCard key={session.id} session={session} onUpdateSession={onUpdateSession} />
+                        <SessionCard key={session.id} session={session} onUpdateSession={onUpdateSession} treatmentsMap={treatmentsMap} />
                     ))}
                 </div>
             )}

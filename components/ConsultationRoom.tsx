@@ -4,8 +4,8 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Odontogram } from './Odontogram';
 import { Toolbar } from './Toolbar';
 import { TreatmentPlan } from './TreatmentPlan';
-import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor, MedicalHistory, Budget, ProposedSession, AppSettings } from '../types';
-import { ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, DENTAL_TREATMENTS, QUADRANTS_PERMANENT, QUADRANTS_DECIDUOUS, TREATMENTS_MAP } from '../constants';
+import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor, MedicalHistory, Budget, ProposedSession, AppSettings, DentalTreatment } from '../types';
+import { ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, QUADRANTS_PERMANENT, QUADRANTS_DECIDUOUS } from '../constants';
 import { DentalIcon, SaveIcon, MoonIcon, SunIcon, CalendarIcon, ArrowLeftIcon, OdontogramIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, FileTextIcon, ClipboardListIcon, DollarSignIcon, PlusIcon } from './icons';
 import { ClinicalFindings } from './ClinicalFindings';
 import { StatusBar } from './StatusBar';
@@ -33,10 +33,11 @@ interface ConsultationRoomProps {
     initialTab?: MainView;
     doctors: Doctor[];
     settings: AppSettings;
+    treatments: DentalTreatment[];
 }
 
 
-export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToAdmin, onNavigateToPatient, isFirstPatient, isLastPatient, onSavePayment, onDeletePayment, initialTab, doctors, settings }: ConsultationRoomProps) {
+export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToAdmin, onNavigateToPatient, isFirstPatient, isLastPatient, onSavePayment, onDeletePayment, initialTab, doctors, settings, treatments }: ConsultationRoomProps) {
     const [record, setRecord] = useState(patientRecord);
     const [theme, setTheme] = useState<Theme>('dark');
     const [activeView, setActiveView] = useState<MainView>(initialTab || 'odontogram');
@@ -46,6 +47,13 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
     const [editingFinding, setEditingFinding] = useState<ClinicalFinding | null>(null);
     const [budgetToPrint, setBudgetToPrint] = useState<Budget | null>(null);
     const printRef = React.useRef<HTMLDivElement>(null);
+    
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
     
     useEffect(() => {
         setRecord(patientRecord);
@@ -104,10 +112,10 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
             .flatMap(session => session.treatments)
             .filter(treatment => treatment.status === 'completed')
             .map(treatment => {
-                const treatmentInfo = TREATMENTS_MAP[treatment.treatmentId];
+                const treatmentInfo = treatmentsMap[treatment.treatmentId];
                 return `${treatmentInfo.label} (Diente ${treatment.toothId})`;
             });
-    }, [record.sessions]);
+    }, [record.sessions, treatmentsMap]);
 
     const handleDeleteFinding = (findingId: string) => {
         setRecord(prev => {
@@ -138,9 +146,8 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
         });
     };
     
-    // FIX: Refactored function to use an immutable update pattern, which resolves a type inference error on the 'tooth' object.
     const addFinding = useCallback((treatmentId: ToothCondition | WholeToothCondition, toothInfo: { toothId: number; surface: ToothSurfaceName | 'whole' }) => {
-        const treatmentInfo = DENTAL_TREATMENTS.find(t => t.id === treatmentId);
+        const treatmentInfo = treatments.find(t => t.id === treatmentId);
         if (!treatmentInfo) return;
 
         setOdontogramState(prevState => {
@@ -172,10 +179,10 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
             };
         });
 
-    }, [setOdontogramState]);
+    }, [setOdontogramState, treatments]);
     
     const applyCompletedTreatment = useCallback((treatmentId: ToothCondition | WholeToothCondition, toothInfo: { toothId: number; surface: ToothSurfaceName | 'whole' }) => {
-        const treatmentInfo = DENTAL_TREATMENTS.find(t => t.id === treatmentId);
+        const treatmentInfo = treatments.find(t => t.id === treatmentId);
         if (!treatmentInfo) return;
 
         setOdontogramState(prevState => {
@@ -220,7 +227,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
 
             return { ...prevState, [toothId]: updatedTooth };
         });
-    }, [setOdontogramState]);
+    }, [setOdontogramState, treatments]);
 
      const updateFinding = (findingId: string, newCondition: ToothCondition | WholeToothCondition) => {
         setRecord(prev => {
@@ -262,7 +269,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
     };
 
     const handleSelectTreatmentFromModal = (treatmentId: ToothCondition | WholeToothCondition) => {
-        const treatmentInfo = DENTAL_TREATMENTS.find(t => t.id === treatmentId);
+        const treatmentInfo = treatments.find(t => t.id === treatmentId);
     
         if (editingFinding) {
             updateFinding(editingFinding.id, treatmentId);
@@ -403,7 +410,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                  newRecord.sessions = newSessions;
                  
                  const tooth = newRecord[targetOdontogramKey][finalTreatment.toothId];
-                 const treatmentInfo = DENTAL_TREATMENTS.find(t => t.id === finalTreatment.treatmentId);
+                 const treatmentInfo = treatments.find(t => t.id === finalTreatment.treatmentId);
 
                  if (treatmentInfo) {
                     const updateLocation = (key: ToothSurfaceName | 'whole') => {
@@ -548,8 +555,9 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                                         findings={allFindings}
                                         onDeleteFinding={handleDeleteFinding}
                                         onEditFinding={handleEditFindingClick}
+                                        treatments={treatments}
                                     />
-                                     {allFindings.length > 0 && (
+                                     {allFindings.length > 0 && !record.sessions.length && (
                                         <div className="mt-6 text-center">
                                             <button
                                                 onClick={() => setActiveView('plan')}
@@ -564,11 +572,11 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                                 </div>
                             </div>
                         )}
-                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveOrUpdateBudget={handleSaveOrUpdateBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} onUpdateBudget={handleUpdateBudget} onPrintBudget={setBudgetToPrint} />}
-                         {activeView === 'history' && <ClinicalHistory sessions={record.sessions} onUpdateSession={handleUpdateSession} />}
+                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveOrUpdateBudget={handleSaveOrUpdateBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} onUpdateBudget={handleUpdateBudget} onPrintBudget={setBudgetToPrint} treatments={treatments} />}
+                         {activeView === 'history' && <ClinicalHistory sessions={record.sessions} onUpdateSession={handleUpdateSession} treatments={treatments} />}
                          {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} doctors={doctors} treatments={allCompletedTreatments} />}
                          {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} patientName={patient.name} doctors={doctors} />}
-                         {activeView === 'accounts' && <Accounts sessions={record.sessions} patientId={record.patientId} payments={record.payments} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} patientName={patient.name}/>}
+                         {activeView === 'accounts' && <Accounts sessions={record.sessions} patientId={record.patientId} payments={record.payments} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} patientName={patient.name} treatments={treatments}/>}
                     </div>
                 </main>
 
@@ -581,6 +589,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                             setEditingFinding(null);
                         }}
                         onSelectTreatment={handleSelectTreatmentFromModal}
+                        treatments={treatments}
                     />
                 )}
             </div>
@@ -594,6 +603,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                         findings={allFindings}
                         doctors={doctors}
                         settings={settings}
+                        treatments={treatments}
                     />
                 )}
             </div>

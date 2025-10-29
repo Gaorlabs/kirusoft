@@ -1,8 +1,7 @@
 
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import type { Session, Payment } from '../types';
-import { TREATMENTS_MAP } from '../constants';
+import type { Session, Payment, DentalTreatment } from '../types';
 import { PrintIcon, DentalIcon, PlusIcon, CloseIcon, TrashIcon, DollarSignIcon, CheckIcon, PencilIcon } from './icons';
 import { PaymentReceiptToPrint } from './PaymentReceiptToPrint';
 
@@ -69,7 +68,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ onClose, onSave, paymentToE
                     </div>
                     <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
                         <button type="button" onClick={onClose} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 py-2 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold">Cancelar</button>
-                        <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-semibold">Guardar Pago</button>
+                        <button type="submit" onClick={handleSubmit} className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-semibold">Guardar Pago</button>
                     </div>
                 </form>
             </div>
@@ -86,9 +85,10 @@ interface AccountSummaryModalProps {
     totalCost: number;
     totalPaid: number;
     balance: number;
+    treatmentsMap: Record<string, DentalTreatment>;
 }
 
-const AccountSummaryModal: React.FC<AccountSummaryModalProps> = ({ onClose, onPrintA4, sessions, patientName, totalCost, totalPaid, balance }) => {
+const AccountSummaryModal: React.FC<AccountSummaryModalProps> = ({ onClose, onPrintA4, sessions, patientName, totalCost, totalPaid, balance, treatmentsMap }) => {
     const allTreatments = useMemo(() => sessions.flatMap(s => s.treatments.map(t => ({ ...t, sessionName: s.name }))), [sessions]);
 
     return (
@@ -112,7 +112,7 @@ const AccountSummaryModal: React.FC<AccountSummaryModalProps> = ({ onClose, onPr
 
                         {allTreatments.length > 0 && 
                             allTreatments.map(t => {
-                                const info = TREATMENTS_MAP[t.treatmentId];
+                                const info = treatmentsMap[t.treatmentId];
                                 return (
                                     <div key={t.id} className="grid grid-cols-3 gap-1">
                                         <span className="col-span-2 truncate">{info?.label} (D{t.toothId})</span>
@@ -161,21 +161,22 @@ interface AccountsProps {
     patientId: string;
     payments: Payment[];
     patientName: string;
+    treatments: DentalTreatment[];
     onSavePayment: (paymentData: { patientId: string; amount: number; method: string; date: string; id?: string }) => void;
     onDeletePayment: (paymentId: string, patientId: string) => void;
 }
 
-// FIX: Defined a specific interface for the component's props to resolve a type error where `clinicName` was missing.
 interface AccountStatementToPrintProps {
     sessions: Session[];
     patientName: string;
     clinicName: string;
     payments: Payment[];
+    treatmentsMap: Record<string, DentalTreatment>;
 }
 
-const AccountStatementToPrint = React.forwardRef<HTMLDivElement, AccountStatementToPrintProps>(({ sessions, patientName, clinicName, payments }, ref) => {
+const AccountStatementToPrint = React.forwardRef<HTMLDivElement, AccountStatementToPrintProps>(({ sessions, patientName, clinicName, payments, treatmentsMap }, ref) => {
     const allTreatments = useMemo(() => sessions.flatMap(s => s.treatments.map(t => ({ ...t, sessionName: s.name }))), [sessions]);
-    const totalCost = useMemo(() => allTreatments.reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0), [allTreatments]);
+    const totalCost = useMemo(() => allTreatments.reduce((sum, t) => sum + (treatmentsMap[t.treatmentId]?.price || 0), 0), [allTreatments, treatmentsMap]);
     const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + p.amount, 0), [payments]);
     const balance = totalCost - totalPaid;
 
@@ -204,7 +205,7 @@ const AccountStatementToPrint = React.forwardRef<HTMLDivElement, AccountStatemen
                 </thead>
                 <tbody>
                     {allTreatments.map(t => {
-                        const info = TREATMENTS_MAP[t.treatmentId];
+                        const info = treatmentsMap[t.treatmentId];
                         return (
                             <tr key={t.id} className="border-b">
                                 <td className="p-2">{info?.label}</td>
@@ -258,13 +259,20 @@ const StatCard: React.FC<{ title: string; value: string; colorClass: string; ico
     </div>
 );
 
-export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payments, patientName, onSavePayment, onDeletePayment }) => {
+export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payments, patientName, treatments, onSavePayment, onDeletePayment }) => {
     const printRef = useRef<HTMLDivElement>(null);
     const [editingPayment, setEditingPayment] = useState<Payment | null | {}>(null);
     const [itemToPrint, setItemToPrint] = useState<Payment | 'statement' | null>(null);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
 
-    const totalCost = useMemo(() => sessions.flatMap(s => s.treatments).reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0), [sessions]);
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
+
+    const totalCost = useMemo(() => sessions.flatMap(s => s.treatments).reduce((sum, t) => sum + (treatmentsMap[t.treatmentId]?.price || 0), 0), [sessions, treatmentsMap]);
     const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + p.amount, 0), [payments]);
     const balance = totalCost - totalPaid;
 
@@ -378,11 +386,12 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
                     totalCost={totalCost}
                     totalPaid={totalPaid}
                     balance={balance}
+                    treatmentsMap={treatmentsMap}
                 />
             )}
 
             <div className="hidden">
-                 {itemToPrint === 'statement' && <AccountStatementToPrint ref={printRef} sessions={sessions} clinicName="Kiru" payments={payments} patientName={patientName} />}
+                 {itemToPrint === 'statement' && <AccountStatementToPrint ref={printRef} sessions={sessions} clinicName="Kiru" payments={payments} patientName={patientName} treatmentsMap={treatmentsMap} />}
                  {itemToPrint && typeof itemToPrint === 'object' && <PaymentReceiptToPrint ref={printRef} payment={itemToPrint} clinicName="Kiru" patientName={patientName} />}
             </div>
         </div>

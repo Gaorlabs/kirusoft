@@ -1,8 +1,8 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment, Budget, ClinicalFinding } from '../types';
-import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
+import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment, Budget, ClinicalFinding, DentalTreatment, TreatmentApplication } from '../types';
+import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENT_CATEGORIES } from '../constants';
 import {
     DashboardIcon, AppointmentIcon, UsersIcon, MegaphoneIcon, SettingsIcon, PlusIcon, PencilIcon, TrashIcon, BriefcaseIcon, DentalIcon, MoonIcon, SunIcon, OdontogramIcon, ChevronDownIcon, CalendarIcon, WhatsappIcon, DollarSignIcon
 } from './icons';
@@ -12,9 +12,10 @@ import { AdminPromotionModal } from './AdminPromotionModal';
 import { AgendaView } from './AgendaView';
 import { DoctorAvailabilityModal } from './DoctorAvailabilityModal';
 import { AdminPaymentModal } from './AdminPaymentModal';
+import { AdminTreatmentModal } from './AdminTreatmentModal';
 
 
-type AdminTab = 'dashboard' | 'agenda' | 'patients' | 'doctors' | 'promotions' | 'settings' | 'accounts';
+type AdminTab = 'dashboard' | 'agenda' | 'patients' | 'doctors' | 'promotions' | 'settings' | 'accounts' | 'services';
 type MainView = 'odontogram' | 'plan' | 'history' | 'prescriptions' | 'consents' | 'accounts';
 
 type Theme = 'light' | 'dark';
@@ -25,6 +26,7 @@ interface AdminPageProps {
     promotions: Promotion[];
     settings: AppSettings;
     patientRecords: Record<string, PatientRecord>;
+    treatments: DentalTreatment[];
     onSaveAppointment: (data: Omit<Appointment, 'id'> & { id?: string }) => void;
     onDeleteAppointment: (id: string) => void;
     onSaveDoctor: (data: Omit<Doctor, 'id'> & { id?: string }) => void;
@@ -32,6 +34,8 @@ interface AdminPageProps {
     onSavePromotion: (data: Omit<Promotion, 'id' | 'isActive'> & { id?: string }) => void;
     onDeletePromotion: (id: string) => void;
     onTogglePromotionStatus: (id: string) => void;
+    onSaveTreatment: (data: Omit<DentalTreatment, 'icon'> & { id?: string; }) => void;
+    onDeleteTreatment: (id: string) => void;
     setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
     onLogout: () => void;
     onOpenClinicalRecord: (patient: Appointment, targetTab?: MainView) => void;
@@ -72,8 +76,16 @@ const TabButton: React.FC<{
 const AdminAccountsView: React.FC<{
     patientRecords: Record<string, PatientRecord>,
     appointments: Appointment[],
+    treatments: DentalTreatment[];
     onOpenClinicalRecord: (patient: Appointment, targetTab: MainView) => void;
-}> = ({ patientRecords, appointments, onOpenClinicalRecord }) => {
+}> = ({ patientRecords, appointments, treatments, onOpenClinicalRecord }) => {
+
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
 
     const patientSummaries = useMemo(() => {
         const summaries: Record<string, { patientId: string; name: string; totalBilled: number; totalPaid: number; balance: number; appointment: Appointment }> = {};
@@ -91,15 +103,10 @@ const AdminAccountsView: React.FC<{
             }
         });
 
-        // FIX: Used Object.values to iterate over patient records, ensuring proper type inference and preventing potential arithmetic errors.
-        // Also added an explicit type to `record` to avoid it being inferred as `unknown`.
         Object.values(patientRecords).forEach((record: PatientRecord) => {
             const summary = summaries[record.patientId];
             if (summary) {
-                // FIX: Explicitly typing the accumulator and item parameters in `reduce` prevents type inference issues that can lead to arithmetic errors, especially when amounts might be strings from localStorage.
-                // FIX: Defensively cast treatment price to a number to prevent arithmetic errors.
-                const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum: number, t: AppliedTreatment) => sum + (Number(TREATMENTS_MAP[t.treatmentId]?.price) || 0), 0);
-                // FIX: Explicitly type `p` as `Payment` and convert `p.amount` to a number to prevent arithmetic errors from string concatenation, which can occur with data from localStorage.
+                const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum: number, t: AppliedTreatment) => sum + (Number(treatmentsMap[t.treatmentId]?.price) || 0), 0);
                 const paid = (record.payments || []).reduce((sum: number, p: Payment) => sum + (Number(p.amount) || 0), 0);
                 
                 summary.totalBilled = billed;
@@ -110,7 +117,7 @@ const AdminAccountsView: React.FC<{
         
         return Object.values(summaries);
 
-    }, [patientRecords, appointments]);
+    }, [patientRecords, appointments, treatmentsMap]);
 
     return (
         <div>
@@ -157,7 +164,16 @@ const AdminDashboardView: React.FC<{
     patientRecords: Record<string, PatientRecord>;
     doctors: Doctor[];
     settings: AppSettings;
-}> = ({ appointments, patientRecords, doctors, settings }) => {
+    treatments: DentalTreatment[];
+}> = ({ appointments, patientRecords, doctors, settings, treatments }) => {
+
+    const treatmentsMap = useMemo(() => 
+        treatments.reduce((acc, treatment) => {
+            acc[treatment.id] = treatment;
+            return acc;
+        }, {} as Record<string, DentalTreatment>), 
+    [treatments]);
+
     const allFindings = useMemo(() => {
         return Object.values(patientRecords).flatMap((record: PatientRecord) => {
             const permanentFindings = Object.values(record.permanentOdontogram).flatMap(tooth => tooth.findings);
@@ -177,6 +193,7 @@ const AdminDashboardView: React.FC<{
 
         const firstAppointmentDate: Record<string, Date> = {};
         [...appointments].sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()).forEach(app => {
+            // FIX: Replaced `acc` with `firstAppointmentDate` to correct a reference error. The `acc` variable was not defined in the scope of the `forEach` loop, and the intended logic was to check for the existence of an appointment email in the `firstAppointmentDate` object.
             if (!firstAppointmentDate[app.email]) {
                 firstAppointmentDate[app.email] = new Date(app.dateTime);
             }
@@ -220,7 +237,7 @@ const AdminDashboardView: React.FC<{
             (record.sessions || []).forEach(session => {
                 if (session.doctorId) {
                     const completedTreatments = session.treatments.filter(t => t.status === 'completed');
-                    const sessionRevenue = completedTreatments.reduce((sum, t) => sum + (Number(TREATMENTS_MAP[t.treatmentId]?.price) || 0), 0);
+                    const sessionRevenue = completedTreatments.reduce((sum, t) => sum + (Number(treatmentsMap[t.treatmentId]?.price) || 0), 0);
                     revenueMap[session.doctorId] = (revenueMap[session.doctorId] || 0) + sessionRevenue;
                 }
             });
@@ -233,7 +250,7 @@ const AdminDashboardView: React.FC<{
         const total = sortedRevenue.reduce((sum, item) => sum + item.total, 0);
 
         return { data: sortedRevenue, total };
-    }, [patientRecords, doctorsMap]);
+    }, [patientRecords, doctorsMap, treatmentsMap]);
     
     const popularTreatments = useMemo(() => {
         const treatmentCounts = Object.values(patientRecords)
@@ -248,10 +265,10 @@ const AdminDashboardView: React.FC<{
             .sort(([, a], [, b]) => b - a)
             .slice(0, 5)
             .map(([treatmentId, count]) => ({
-                name: TREATMENTS_MAP[treatmentId]?.label || 'Desconocido',
+                name: treatmentsMap[treatmentId]?.label || 'Desconocido',
                 count
             }));
-    }, [patientRecords]);
+    }, [patientRecords, treatmentsMap]);
 
     const budgetTotals = useMemo(() => {
         const totals: Record<string, number> = {};
@@ -259,24 +276,26 @@ const AdminDashboardView: React.FC<{
             (record.budgets || []).forEach(budget => {
                 const total = budget.proposedSessions.flatMap(s => s.findingIds).reduce((acc, findingId) => {
                     const finding = allFindings.find((f: ClinicalFinding) => f.id === findingId);
-                    return acc + (finding ? TREATMENTS_MAP[finding.condition]?.price || 0 : 0);
+                    return acc + (finding ? treatmentsMap[finding.condition]?.price || 0 : 0);
                 }, 0);
                 totals[budget.id] = total;
             });
         });
         return totals;
-    }, [patientRecords, allFindings]);
+    }, [patientRecords, allFindings, treatmentsMap]);
     
     const pendingBudgets = useMemo(() => {
         const budgets: (Appointment & { budget: Budget })[] = [];
         Object.values(patientRecords).forEach((record: PatientRecord) => {
             if (record.budgets) {
                 record.budgets.forEach(budget => {
-                    const needsFollowUp = budget.followUpDate && new Date(budget.followUpDate) <= new Date();
-                    if (budget.status === 'proposed' && needsFollowUp) {
-                        const patientAppointment = appointmentsMap[record.patientId];
-                        if (patientAppointment) {
-                            budgets.push({ ...patientAppointment, budget });
+                    if (budget.followUpDate) {
+                        const needsFollowUp = new Date(budget.followUpDate) <= new Date();
+                        if (budget.status === 'proposed' && needsFollowUp) {
+                            const patientAppointment = appointmentsMap[record.patientId];
+                            if (patientAppointment) {
+                                budgets.push({ ...patientAppointment, budget });
+                            }
                         }
                     }
                 });
@@ -448,7 +467,7 @@ const PatientDetailsView: React.FC<{
             <div className="flex justify-between items-start">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{patient.name}</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Mostrando datos de la cita más reciente.</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Mostrando datos de la cita más recente.</p>
                 </div>
                 <div className="flex space-x-2 flex-shrink-0">
                     <button onClick={onEdit} className="flex items-center space-x-2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-transform hover:scale-105">
@@ -494,6 +513,56 @@ const PatientDetailsView: React.FC<{
     );
 };
 
+const AdminTreatmentsView: React.FC<{
+    treatments: DentalTreatment[];
+    onSave: (data: Omit<DentalTreatment, 'icon'> & { id?: string; }) => void;
+    onDelete: (id: string) => void;
+}> = ({ treatments, onSave, onDelete }) => {
+    const [editingTreatment, setEditingTreatment] = useState<DentalTreatment | {} | null>(null);
+
+    const handleSave = (data: Omit<DentalTreatment, 'icon'> & { id?: string; }) => {
+        onSave(data);
+        setEditingTreatment(null);
+    };
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Servicios y Precios</h2>
+                <button onClick={() => setEditingTreatment({})} className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-lg flex items-center space-x-2"><PlusIcon className="w-5 h-5" /><span>Nuevo Servicio</span></button>
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-x-auto border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
+                    <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700">
+                        <tr>
+                            <th scope="col" className="px-6 py-3">Servicio</th>
+                            <th scope="col" className="px-6 py-3">Categoría</th>
+                            <th scope="col" className="px-6 py-3 text-right">Precio</th>
+                            <th scope="col" className="px-6 py-3 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {treatments.map(treatment => (
+                            <tr key={treatment.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600/50">
+                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{treatment.label}</td>
+                                <td className="px-6 py-4">{treatment.category}</td>
+                                <td className="px-6 py-4 text-right font-semibold">S/ {Number(treatment.price).toFixed(2)}</td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="flex items-center justify-center space-x-2">
+                                        <button onClick={() => setEditingTreatment(treatment)} className="p-2 text-yellow-500 hover:bg-yellow-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Editar"><PencilIcon className="w-5 h-5" /></button>
+                                        <button onClick={() => onDelete(treatment.id)} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Eliminar"><TrashIcon className="w-5 h-5" /></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {editingTreatment && <AdminTreatmentModal treatment={editingTreatment as DentalTreatment} onClose={() => setEditingTreatment(null)} onSave={handleSave} />}
+        </div>
+    );
+};
+
 
 export const AdminPage: React.FC<AdminPageProps> = (props) => {
     const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -511,14 +580,12 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
     const [selectedPatient, setSelectedPatient] = useState<Appointment | null>(null);
 
     const patientMap = useMemo(() => props.appointments.reduce((acc, app) => {
-        // Use email as a unique patient identifier. Keep the most recent appointment for display.
         if (!acc[app.email] || new Date(app.dateTime) > new Date(acc[app.email].dateTime)) {
             acc[app.email] = app;
         }
         return acc;
     }, {} as Record<string, Appointment>), [props.appointments]);
 
-    // FIX: Explicitly type the sort callback parameters `a` and `b` as `Appointment` to resolve the TypeScript error where they were being inferred as `unknown`.
     const patients = useMemo(() => Object.values(patientMap).sort((a: Appointment, b: Appointment) => a.name.localeCompare(b.name)), [patientMap]);
 
     useEffect(() => {
@@ -566,7 +633,6 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
         setEditingPromotion(null);
     };
 
-    // FIX: Moved settings handlers out of render logic to prevent potential stale closures and improve performance.
     const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setLocalSettings(prev => ({ ...prev, [name]: value }));
@@ -607,7 +673,7 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
     const renderContent = () => {
         switch (activeTab) {
             case 'dashboard':
-                return <AdminDashboardView appointments={props.appointments} patientRecords={props.patientRecords} doctors={props.doctors} settings={props.settings}/>;
+                return <AdminDashboardView appointments={props.appointments} patientRecords={props.patientRecords} doctors={props.doctors} settings={props.settings} treatments={props.treatments} />;
             case 'agenda':
                  return (
                     <div className="h-full flex flex-col">
@@ -793,7 +859,14 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                 return <AdminAccountsView
                     patientRecords={props.patientRecords}
                     appointments={props.appointments}
+                    treatments={props.treatments}
                     onOpenClinicalRecord={props.onOpenClinicalRecord}
+                />;
+            case 'services':
+                return <AdminTreatmentsView 
+                    treatments={props.treatments} 
+                    onSave={props.onSaveTreatment} 
+                    onDelete={props.onDeleteTreatment} 
                 />;
             case 'settings': {
                 return (
@@ -890,6 +963,7 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                     <TabButton icon={<UsersIcon />} label="Doctores" isActive={activeTab === 'doctors'} onClick={() => setActiveTab('doctors')} />
                     <TabButton icon={<MegaphoneIcon />} label="Promociones" isActive={activeTab === 'promotions'} onClick={() => setActiveTab('promotions')} />
                     <TabButton icon={<DollarSignIcon />} label="Finanzas" isActive={activeTab === 'accounts'} onClick={() => setActiveTab('accounts')} />
+                    <TabButton icon={<DentalIcon />} label="Servicios" isActive={activeTab === 'services'} onClick={() => setActiveTab('services')} />
                     <TabButton icon={<SettingsIcon />} label="Configuración" isActive={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
                 </nav>
                  <div className="mt-auto pt-4 border-t border-slate-200 dark:border-slate-700">
