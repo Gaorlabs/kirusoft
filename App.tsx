@@ -114,17 +114,37 @@ function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<Rea
       const stickyValue = window.localStorage.getItem(key);
       if (stickyValue !== null) {
         const parsedValue = JSON.parse(stickyValue);
-        // Special handling for treatments to ensure icons are present
-        if (key === 'kiru-treatments' && Array.isArray(parsedValue) && Array.isArray(defaultValue)) {
-             const defaultMap = defaultValue.reduce((acc, t) => ({...acc, [t.id]: t.icon}), {} as Record<string, React.ReactNode>);
+
+        // Handle arrays
+        if (Array.isArray(defaultValue)) {
+          if (!Array.isArray(parsedValue)) {
+            // Data corruption (e.g. stored as object), fallback to default
+            console.warn(`Data for key "${key}" is corrupted. Falling back to default.`);
+            return defaultValue;
+          }
+          // Special handling for treatments to re-add icons which are not stored.
+          if (key === 'kiru-treatments') {
+             const defaultMap = (defaultValue as DentalTreatment[]).reduce((acc, t) => ({...acc, [t.id]: t.icon}), {} as Record<string, React.ReactNode>);
              return parsedValue.map(t => ({ ...t, icon: defaultMap[t.id] || <DentalIcon /> })) as T;
+          }
+          // For all other arrays, just return the parsed value
+          return parsedValue as T;
         }
-        return { ...defaultValue, ...parsedValue };
+
+        // Handle objects (but not arrays)
+        if (typeof defaultValue === 'object' && defaultValue !== null) {
+            return { ...defaultValue, ...parsedValue };
+        }
+
+        // This would be for primitives, but we are not using it for primitives.
+        // For safety, return the parsed value.
+        return parsedValue as T;
       }
     } catch (error) {
       console.error(`Error parsing localStorage key "${key}":`, error);
+      return defaultValue; // Fallback on error
     }
-    return defaultValue;
+    return defaultValue; // Fallback if no sticky value
   });
 
   useEffect(() => {
