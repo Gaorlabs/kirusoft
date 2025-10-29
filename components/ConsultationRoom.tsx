@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Odontogram } from './Odontogram';
 import { Toolbar } from './Toolbar';
 import { TreatmentPlan } from './TreatmentPlan';
-import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor, MedicalHistory, Budget, ProposedSession } from '../types';
+import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor, MedicalHistory, Budget, ProposedSession, AppSettings } from '../types';
 import { ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, DENTAL_TREATMENTS, QUADRANTS_PERMANENT, QUADRANTS_DECIDUOUS, TREATMENTS_MAP } from '../constants';
 import { DentalIcon, SaveIcon, MoonIcon, SunIcon, CalendarIcon, ArrowLeftIcon, OdontogramIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, FileTextIcon, ClipboardListIcon, DollarSignIcon, PlusIcon } from './icons';
 import { ClinicalFindings } from './ClinicalFindings';
@@ -14,6 +14,7 @@ import { ClinicalHistory } from './ClinicalHistory';
 import { Prescriptions } from './Prescriptions';
 import { Consents } from './Consents';
 import { Accounts } from './Accounts';
+import { BudgetToPrint } from './BudgetToPrint';
 
 type OdontogramType = 'permanent' | 'deciduous';
 type Theme = 'light' | 'dark';
@@ -31,10 +32,11 @@ interface ConsultationRoomProps {
     onDeletePayment: (paymentId: string, patientId: string) => void;
     initialTab?: MainView;
     doctors: Doctor[];
+    settings: AppSettings;
 }
 
 
-export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToAdmin, onNavigateToPatient, isFirstPatient, isLastPatient, onSavePayment, onDeletePayment, initialTab, doctors }: ConsultationRoomProps) {
+export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToAdmin, onNavigateToPatient, isFirstPatient, isLastPatient, onSavePayment, onDeletePayment, initialTab, doctors, settings }: ConsultationRoomProps) {
     const [record, setRecord] = useState(patientRecord);
     const [theme, setTheme] = useState<Theme>('dark');
     const [activeView, setActiveView] = useState<MainView>(initialTab || 'odontogram');
@@ -42,6 +44,8 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
     const [activeTooth, setActiveTooth] = useState<{ toothId: number; surface: ToothSurfaceName | 'whole' } | null>(null);
     const [isTreatmentModalOpen, setIsTreatmentModalOpen] = useState(false);
     const [editingFinding, setEditingFinding] = useState<ClinicalFinding | null>(null);
+    const [budgetToPrint, setBudgetToPrint] = useState<Budget | null>(null);
+    const printRef = React.useRef<HTMLDivElement>(null);
     
     useEffect(() => {
         setRecord(patientRecord);
@@ -52,6 +56,28 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
         document.documentElement.classList.remove('dark', 'light');
         document.documentElement.classList.add(theme);
     }, [theme]);
+
+    useEffect(() => {
+        if (budgetToPrint && printRef.current) {
+            const printContent = printRef.current;
+            const winPrint = window.open('', '', 'width=900,height=650');
+            if (winPrint) {
+                winPrint.document.write('<html><head><title>Presupuesto</title>');
+                winPrint.document.write('<script src="https://cdn.tailwindcss.com"></script>');
+                winPrint.document.write('<style>@media print { @page { size: A4; margin: 0; } body { -webkit-print-color-adjust: exact; } }</style>');
+                winPrint.document.write('</head><body>');
+                winPrint.document.write(printContent.innerHTML);
+                winPrint.document.write('</body></html>');
+                winPrint.document.close();
+                winPrint.focus();
+                setTimeout(() => {
+                    winPrint.print();
+                    winPrint.close();
+                    setBudgetToPrint(null);
+                }, 500);
+            }
+        }
+    }, [budgetToPrint]);
     
     const isPermanent = odontogramType === 'permanent';
     const odontogramState = isPermanent ? record.permanentOdontogram : record.deciduousOdontogram;
@@ -253,22 +279,39 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
         setEditingFinding(null);
     };
     
-     const handleSaveBudget = (proposedSessions: Omit<ProposedSession, 'id'>[]) => {
-        const newBudget: Budget = {
-            id: crypto.randomUUID(),
-            name: `Presupuesto ${new Date().toLocaleDateString()}`,
-            date: new Date().toISOString(),
-            status: 'proposed',
-            proposedSessions: proposedSessions.map(ps => ({...ps, id: crypto.randomUUID()})),
-        };
-
-        setRecord(prev => ({
-            ...prev,
-            budgets: [...prev.budgets, newBudget],
-        }));
-        
+    const handleSaveOrUpdateBudget = (budgetData: Partial<Budget> & { proposedSessions: Omit<ProposedSession, 'id'>[] }) => {
+        setRecord(prev => {
+            const newRecord = structuredClone(prev);
+            
+            if (budgetData.id) { // Update
+                const index = newRecord.budgets.findIndex(b => b.id === budgetData.id);
+                if (index > -1) {
+                    const existingBudget = newRecord.budgets[index];
+                    const updatedSessions = budgetData.proposedSessions.map(ps => ({ ...ps, id: crypto.randomUUID() }));
+                    newRecord.budgets[index] = { ...existingBudget, ...budgetData, proposedSessions: updatedSessions };
+                }
+            } else { // Create
+                const newBudget: Budget = {
+                    id: crypto.randomUUID(),
+                    name: `Presupuesto ${new Date().toLocaleDateString()}`,
+                    date: new Date().toISOString(),
+                    status: 'proposed',
+                    proposedSessions: budgetData.proposedSessions.map(ps => ({ ...ps, id: crypto.randomUUID() })),
+                };
+                newRecord.budgets.push(newBudget);
+            }
+            
+            return newRecord;
+        });
         alert('Presupuesto guardado con éxito.');
         setActiveView('plan');
+    };
+
+    const handleUpdateBudget = (budgetId: string, updatedData: Partial<Budget>) => {
+        setRecord(prev => ({
+            ...prev,
+            budgets: prev.budgets.map(b => b.id === budgetId ? { ...b, ...updatedData } : b)
+        }));
     };
 
     const handleActivateBudget = (budgetId: string) => {
@@ -471,7 +514,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                     <div className="border-b border-gray-200 dark:border-gray-700 mb-4">
                         <nav className="flex space-x-1">
                             <TabButton view="odontogram" label="Odontograma" icon={<OdontogramIcon className="w-5 h-5"/>} />
-                            <TabButton view="plan" label="Presupuestos" icon={<CalendarIcon className="w-5 h-5"/>} />
+                            <TabButton view="plan" label="Presupuestos y Plan" icon={<CalendarIcon className="w-5 h-5"/>} />
                             <TabButton view="history" label="Historial" icon={<BriefcaseIcon className="w-5 h-5"/>} />
                             <TabButton view="prescriptions" label="Recetas" icon={<FileTextIcon className="w-5 h-5"/>} />
                             <TabButton view="consents" label="Consentimientos" icon={<ClipboardListIcon className="w-5 h-5"/>} />
@@ -521,7 +564,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                                 </div>
                             </div>
                         )}
-                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveBudget={handleSaveBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} patient={patient} />}
+                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveOrUpdateBudget={handleSaveOrUpdateBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} onUpdateBudget={handleUpdateBudget} onPrintBudget={setBudgetToPrint} />}
                          {activeView === 'history' && <ClinicalHistory sessions={record.sessions} onUpdateSession={handleUpdateSession} />}
                          {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} doctors={doctors} treatments={allCompletedTreatments} />}
                          {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} patientName={patient.name} doctors={doctors} />}
@@ -538,6 +581,19 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                             setEditingFinding(null);
                         }}
                         onSelectTreatment={handleSelectTreatmentFromModal}
+                    />
+                )}
+            </div>
+
+            <div className="hidden">
+                {budgetToPrint && (
+                    <BudgetToPrint 
+                        ref={printRef}
+                        budget={budgetToPrint}
+                        patientName={patient.name}
+                        findings={allFindings}
+                        doctors={doctors}
+                        settings={settings}
                     />
                 )}
             </div>

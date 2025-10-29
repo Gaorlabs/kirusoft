@@ -434,6 +434,7 @@ function App() {
                 onDeletePayment={handleDeletePayment}
                 initialTab={initialTabForConsultation}
                 doctors={doctors}
+                settings={settings}
             />
         );
     } else if (page === 'consultation' && isAuthenticated && currentPatientIndex !== null && !currentPatientRecord) {

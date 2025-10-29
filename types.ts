@@ -153,6 +153,8 @@ export interface Budget {
     date: string;
     status: 'proposed' | 'accepted' | 'rejected';
     proposedSessions: ProposedSession[];
+    followUpDate?: string;
+    notes?: string;
 }
 
 export interface PatientRecord {

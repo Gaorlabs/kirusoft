@@ -1,9 +1,7 @@
 
 
-
-
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment } from '../types';
+import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment, Budget, ClinicalFinding } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
 import {
     DashboardIcon, AppointmentIcon, UsersIcon, MegaphoneIcon, SettingsIcon, PlusIcon, PencilIcon, TrashIcon, BriefcaseIcon, DentalIcon, MoonIcon, SunIcon, OdontogramIcon, ChevronDownIcon, CalendarIcon, WhatsappIcon, DollarSignIcon
@@ -157,160 +155,274 @@ const AdminAccountsView: React.FC<{
 const AdminDashboardView: React.FC<{
     appointments: Appointment[];
     patientRecords: Record<string, PatientRecord>;
-}> = ({ appointments, patientRecords }) => {
+    doctors: Doctor[];
+    settings: AppSettings;
+}> = ({ appointments, patientRecords, doctors, settings }) => {
+    const allFindings = useMemo(() => {
+        return Object.values(patientRecords).flatMap((record: PatientRecord) => {
+            const permanentFindings = Object.values(record.permanentOdontogram).flatMap(tooth => tooth.findings);
+            const deciduousFindings = Object.values(record.deciduousOdontogram).flatMap(tooth => tooth.findings);
+            return [...permanentFindings, ...deciduousFindings];
+        });
+    }, [patientRecords]);
 
     const {
-        todaysAppointmentsCount,
-        activePatientsCount,
-        totalProposedValue,
-        totalRevenue
-    // FIX: Refactored `useMemo` to use a more functional approach with `reduce`, calculating totals directly instead of using mutable variables with `+=`. This prevents potential type-related arithmetic errors.
+        newPatientsThisMonth,
+        pendingRecallsCount,
+        totalRevenue,
+        pendingBudgetsCount
     } = useMemo(() => {
-        const today = new Date().toDateString();
-        const todaysAppointments = appointments.filter(a => new Date(a.dateTime).toDateString() === today);
-        const uniquePatients = new Set(appointments.map(a => a.email));
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        const allRecords = Object.values(patientRecords);
+        const firstAppointmentDate: Record<string, Date> = {};
+        [...appointments].sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()).forEach(app => {
+            if (!firstAppointmentDate[app.email]) {
+                firstAppointmentDate[app.email] = new Date(app.dateTime);
+            }
+        });
 
-        const proposedValue = allRecords
-            .flatMap((record: PatientRecord) => record.sessions || [])
-            .flatMap(s => s.treatments)
-            .filter(t => t.status === 'proposed')
-            .reduce((sum: number, t: AppliedTreatment) => sum + (Number(TREATMENTS_MAP[t.treatmentId]?.price) || 0), 0);
+        let newPatients = 0;
+        Object.values(firstAppointmentDate).forEach(date => {
+            if (date >= startOfMonth) {
+                newPatients++;
+            }
+        });
         
-        const revenue = allRecords
+        let overdueRecalls = 0;
+        let pendingBudgets = 0;
+        
+        Object.values(patientRecords).forEach((r: PatientRecord) => {
+            if (r.recall && new Date(r.recall.date) < now) {
+                overdueRecalls++;
+            }
+            pendingBudgets += (r.budgets || []).filter(b => b.status === 'proposed').length;
+        });
+
+        const revenue = Object.values(patientRecords)
             .flatMap((record: PatientRecord) => record.payments || [])
             .reduce((sum: number, payment: Payment) => sum + (Number(payment.amount) || 0), 0);
 
         return {
-            todaysAppointmentsCount: todaysAppointments.length,
-            activePatientsCount: uniquePatients.size,
-            totalProposedValue: proposedValue,
+            newPatientsThisMonth: newPatients,
+            pendingRecallsCount: overdueRecalls,
             totalRevenue: revenue,
+            pendingBudgetsCount: pendingBudgets,
         };
     }, [appointments, patientRecords]);
-    
-     const weeklyRevenue = useMemo(() => {
-        const last7Days = Array.from({ length: 7 }, (_, i) => {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            return d.toDateString();
-        }).reverse();
 
-        const initialDailyTotals: Record<string, number> = last7Days.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
+    const doctorsMap = useMemo(() => doctors.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {} as Record<string, Doctor>), [doctors]);
+    const appointmentsMap = useMemo(() => appointments.reduce((acc, app) => ({ ...acc, [app.id]: app }), {} as Record<string, Appointment>), [appointments]);
 
-        // FIX: Refactored to use `reduce` for calculating daily totals. This functional approach is more robust, consistent with other calculations in the component, and resolves the arithmetic error by avoiding mutation inside a loop.
-        // Also added an explicit type to `record` to avoid it being inferred as `unknown`.
-        const dailyTotals = Object.values(patientRecords)
-            .flatMap((record: PatientRecord) => record.payments || [])
-            .reduce((totals: Record<string, number>, payment: Payment) => {
-                const paymentDay = new Date(payment.date).toDateString();
-                if (Object.prototype.hasOwnProperty.call(totals, paymentDay)) {
-                    // FIX: Replaced mutating forEach with an immutable update using reduce to resolve arithmetic error and follow functional best practices.
-                    // FIX: Resolved an arithmetic error by providing a fallback to 0 for `totals[paymentDay]`, as indexed access on an object can result in `undefined`.
-                    return {
-                        ...totals,
-                        [paymentDay]: (totals[paymentDay] || 0) + (Number(payment.amount) || 0),
-                    };
+    const revenueByDoctor = useMemo(() => {
+        const revenueMap: Record<string, number> = {};
+        Object.values(patientRecords).forEach((record: PatientRecord) => {
+            (record.sessions || []).forEach(session => {
+                if (session.doctorId) {
+                    const completedTreatments = session.treatments.filter(t => t.status === 'completed');
+                    const sessionRevenue = completedTreatments.reduce((sum, t) => sum + (Number(TREATMENTS_MAP[t.treatmentId]?.price) || 0), 0);
+                    revenueMap[session.doctorId] = (revenueMap[session.doctorId] || 0) + sessionRevenue;
                 }
-                return totals;
-            }, initialDailyTotals);
-        
-        return last7Days.map(day => ({
-            day: new Date(day).toLocaleDateString('es-ES', { weekday: 'short' }),
-            total: dailyTotals[day]
-        }));
-    }, [patientRecords]);
+            });
+        });
+        const sortedRevenue = Object.entries(revenueMap).map(([doctorId, total]) => ({
+            doctorName: doctorsMap[doctorId]?.name || 'Sin Asignar',
+            total,
+        })).sort((a, b) => b.total - a.total);
 
-    const maxRevenue = Math.max(...weeklyRevenue.map(d => d.total), 1);
+        const total = sortedRevenue.reduce((sum, item) => sum + item.total, 0);
 
-    const popularServices = useMemo(() => {
-        const serviceCounts = appointments.reduce((acc, app) => {
-            acc[app.service] = (acc[app.service] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
+        return { data: sortedRevenue, total };
+    }, [patientRecords, doctorsMap]);
+    
+    const popularTreatments = useMemo(() => {
+        const treatmentCounts = Object.values(patientRecords)
+            .flatMap((r: PatientRecord) => r.sessions || [])
+            .flatMap(s => s.treatments)
+            .reduce((acc, t) => {
+                acc[t.treatmentId] = (acc[t.treatmentId] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>);
 
-        return Object.entries(serviceCounts)
+        return Object.entries(treatmentCounts)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 5)
-            .map(([serviceId, count]) => ({
-                name: DENTAL_SERVICES_MAP[serviceId] || 'Desconocido',
+            .map(([treatmentId, count]) => ({
+                name: TREATMENTS_MAP[treatmentId]?.label || 'Desconocido',
                 count
             }));
-    }, [appointments]);
+    }, [patientRecords]);
 
-    const maxPopularServiceCount = popularServices.length > 0 ? popularServices[0].count : 1;
+    const budgetTotals = useMemo(() => {
+        const totals: Record<string, number> = {};
+        Object.values(patientRecords).forEach((record: PatientRecord) => {
+            (record.budgets || []).forEach(budget => {
+                const total = budget.proposedSessions.flatMap(s => s.findingIds).reduce((acc, findingId) => {
+                    const finding = allFindings.find((f: ClinicalFinding) => f.id === findingId);
+                    return acc + (finding ? TREATMENTS_MAP[finding.condition]?.price || 0 : 0);
+                }, 0);
+                totals[budget.id] = total;
+            });
+        });
+        return totals;
+    }, [patientRecords, allFindings]);
+    
+    const pendingBudgets = useMemo(() => {
+        const budgets: (Appointment & { budget: Budget })[] = [];
+        Object.values(patientRecords).forEach((record: PatientRecord) => {
+            if (record.budgets) {
+                record.budgets.forEach(budget => {
+                    const needsFollowUp = budget.followUpDate && new Date(budget.followUpDate) <= new Date();
+                    if (budget.status === 'proposed' && needsFollowUp) {
+                        const patientAppointment = appointmentsMap[record.patientId];
+                        if (patientAppointment) {
+                            budgets.push({ ...patientAppointment, budget });
+                        }
+                    }
+                });
+            }
+        });
+        return budgets.sort((a,b) => new Date(a.budget.followUpDate!).getTime() - new Date(b.budget.followUpDate!).getTime());
+    }, [patientRecords, appointmentsMap]);
 
-    const todaysAppointmentList = useMemo(() => {
-        return appointments
-            .filter(a => new Date(a.dateTime).toDateString() === new Date().toDateString())
-            .sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-    }, [appointments]);
+    const pendingRecalls = useMemo(() => {
+        const recalls: (Appointment & { recall: { date: string; reason: string } })[] = [];
+        const now = new Date();
+        Object.values(patientRecords).forEach((record: PatientRecord) => {
+            if (record.recall && new Date(record.recall.date) < now) {
+                const patientAppointment = appointmentsMap[record.patientId];
+                if (patientAppointment) {
+                    recalls.push({ ...patientAppointment, recall: record.recall });
+                }
+            }
+        });
+        return recalls.sort((a, b) => new Date(a.recall.date).getTime() - new Date(b.recall.date).getTime());
+    }, [patientRecords, appointmentsMap]);
 
+    const doctorColors = ['#ec4899', '#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ef4444'];
+    const maxPopularTreatmentCount = popularTreatments.length > 0 ? popularTreatments[0].count : 1;
+
+    const createPieChartBackground = () => {
+        if (revenueByDoctor.total === 0) return 'conic-gradient(#e5e7eb 0% 100%)';
+        let gradient = 'conic-gradient(';
+        let currentPercentage = 0;
+        revenueByDoctor.data.forEach((item, index) => {
+            const percentage = (item.total / revenueByDoctor.total) * 100;
+            const color = doctorColors[index % doctorColors.length];
+            gradient += `${color} ${currentPercentage}% ${currentPercentage + percentage}%, `;
+            currentPercentage += percentage;
+        });
+        return gradient.slice(0, -2) + ')';
+    };
 
     return (
         <div>
             <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Dashboard</h2>
-            {/* KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                 <StatCard title="Valor de Planes Propuestos" value={`S/ ${totalProposedValue.toFixed(2)}`} icon={<BriefcaseIcon />} />
                  <StatCard title="Ingresos Totales" value={`S/ ${totalRevenue.toFixed(2)}`} icon={<DollarSignIcon />} />
-                 <StatCard title="Pacientes Activos" value={activePatientsCount} icon={<UsersIcon />} />
-                 <StatCard title="Citas para Hoy" value={todaysAppointmentsCount} icon={<AppointmentIcon />} />
+                 <StatCard title="Pacientes Nuevos (Mes)" value={newPatientsThisMonth} icon={<UsersIcon />} />
+                 <StatCard title="Presupuestos Pendientes" value={pendingBudgetsCount} icon={<BriefcaseIcon />} />
+                 <StatCard title="Recalls Vencidos" value={pendingRecallsCount} icon={<CalendarIcon />} />
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Weekly Revenue & Popular Services */}
-                <div className="lg:col-span-2 space-y-6">
-                     {/* Weekly Revenue Chart */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
-                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Ingresos de la Semana</h3>
-                        <div className="flex justify-between items-end h-64 space-x-2">
-                             {weeklyRevenue.map(({ day, total }) => (
-                                <div key={day} className="flex-1 flex flex-col items-center justify-end">
-                                    <div className="text-xs font-bold text-slate-500 dark:text-slate-400">S/{total.toFixed(0)}</div>
-                                    <div 
-                                        className="w-full bg-blue-500 rounded-t-md mt-1 transition-all duration-500 hover:bg-blue-600"
-                                        style={{ height: `${(total / maxRevenue) * 100}%`}}
-                                        title={`S/ ${total.toFixed(2)}`}
-                                    ></div>
-                                    <div className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-2">{day}</div>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 space-y-6">
+                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Tratamientos Populares</h3>
+                        <div className="space-y-4">
+                            {popularTreatments.map(({name, count}) => (
+                                <div key={name}>
+                                    <div className="flex justify-between text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                                        <span>{name}</span>
+                                        <span>{count}</span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+                                        <div className="bg-pink-500 h-2.5 rounded-full" style={{width: `${(count / maxPopularTreatmentCount) * 100}%`}}></div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     </div>
-
-                    {/* Popular Services */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
-                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Servicios Populares</h3>
-                        <div className="space-y-4">
-                            {popularServices.map(({name, count}) => (
-                                <div key={name}>
-                                    <div className="flex justify-between text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                                        <span>{name}</span>
-                                        <span>{count} citas</span>
-                                    </div>
-                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
-                                        <div className="bg-pink-500 h-2.5 rounded-full" style={{width: `${(count / maxPopularServiceCount) * 100}%`}}></div>
-                                    </div>
-                                </div>
-                            ))}
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Recalls Pendientes</h3>
+                         <div className="max-h-[500px] overflow-y-auto">
+                            <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
+                                <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700/50 sticky top-0">
+                                    <tr>
+                                        <th scope="col" className="px-4 py-2">Paciente</th>
+                                        <th scope="col" className="px-4 py-2">Fecha Recall</th>
+                                        <th scope="col" className="px-4 py-2">Motivo</th>
+                                        <th scope="col" className="px-4 py-2 text-center">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pendingRecalls.length > 0 ? pendingRecalls.map(app => (
+                                        <tr key={app.id} className="border-b dark:border-slate-700">
+                                            <td className="px-4 py-2 font-medium text-slate-900 dark:text-white">{app.name}</td>
+                                            <td className="px-4 py-2 text-red-600 dark:text-red-400 font-semibold">{new Date(app.recall.date).toLocaleDateString()}</td>
+                                            <td className="px-4 py-2">{app.recall.reason}</td>
+                                            <td className="px-4 py-2 text-center">
+                                                <button onClick={() => {
+                                                    const message = `Hola ${app.name}, te escribimos de Kiru para recordarte que tienes un control pendiente (${app.recall.reason}). ¡Te esperamos!`;
+                                                    window.open(`https://wa.me/${settings.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+                                                }} className="p-2 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Contactar por WhatsApp">
+                                                    <WhatsappIcon className="w-5 h-5" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr><td colSpan={4} className="text-center py-8">No hay recalls pendientes.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                {/* Today's Agenda */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
-                    <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Agenda del Día</h3>
-                     <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                        {todaysAppointmentList.length > 0 ? todaysAppointmentList.map(app => (
-                            <div key={app.id} className={`p-3 rounded-lg border-l-4 ${APPOINTMENT_STATUS_CONFIG[app.status].borderColor} ${APPOINTMENT_STATUS_CONFIG[app.status].color}`}>
-                                <p className={`font-bold text-sm ${APPOINTMENT_STATUS_CONFIG[app.status].textColor}`}>{app.name}</p>
-                                <p className={`text-xs ${APPOINTMENT_STATUS_CONFIG[app.status].textColor}`}>{new Date(app.dateTime).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'})} - {DENTAL_SERVICES_MAP[app.service]}</p>
+                <div className="xl:col-span-1 space-y-6">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Ingresos por Doctor</h3>
+                        <div className="flex flex-col md:flex-row items-center gap-6">
+                            <div className="relative flex-shrink-0">
+                                <div className="w-32 h-32 rounded-full" style={{ background: createPieChartBackground() }}></div>
+                                <div className="absolute inset-2 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center">
+                                    <span className="text-xl font-bold">S/{revenueByDoctor.total.toFixed(2)}</span>
+                                </div>
                             </div>
-                        )) : (
-                            <p className="text-center text-slate-500 dark:text-slate-400 py-8">No hay citas para hoy.</p>
-                        )}
+                            <div className="space-y-2 text-sm">
+                                {revenueByDoctor.data.map((item, index) => (
+                                    <div key={item.doctorName} className="flex items-center">
+                                        <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: doctorColors[index % doctorColors.length] }}></span>
+                                        <span className="font-semibold">{item.doctorName}:</span>
+                                        <span className="ml-auto text-slate-600 dark:text-slate-300">S/{item.total.toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Presupuestos a Dar Seguimiento</h3>
+                        <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                            {pendingBudgets.length > 0 ? pendingBudgets.map(app => (
+                                <div key={app.budget.id} className="p-3 rounded-lg border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="font-bold text-sm text-slate-800 dark:text-white">{app.name}</p>
+                                            <p className="text-xs text-slate-600 dark:text-slate-300">{app.budget.name} - S/ {budgetTotals[app.budget.id]?.toFixed(2) || '0.00'}</p>
+                                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Seguimiento: {new Date(app.budget.followUpDate!).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</p>
+                                        </div>
+                                        <button onClick={() => {
+                                                const message = `Hola ${app.name}, te escribimos de Kiru para dar seguimiento a tu presupuesto para ${app.budget.name}. ¿Tienes alguna consulta?`;
+                                                window.open(`https://wa.me/${settings.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+                                            }} className="p-2 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Contactar por WhatsApp">
+                                            <WhatsappIcon className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )) : (
+                                <p className="text-center text-slate-500 dark:text-slate-400 py-8">No hay presupuestos que requieran seguimiento.</p>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -495,7 +607,7 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
     const renderContent = () => {
         switch (activeTab) {
             case 'dashboard':
-                return <AdminDashboardView appointments={props.appointments} patientRecords={props.patientRecords} />;
+                return <AdminDashboardView appointments={props.appointments} patientRecords={props.patientRecords} doctors={props.doctors} settings={props.settings}/>;
             case 'agenda':
                  return (
                     <div className="h-full flex flex-col">
