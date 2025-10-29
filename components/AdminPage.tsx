@@ -1,11 +1,13 @@
 
 
-import React, { useState, useMemo, useEffect } from 'react';
+
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
 // FIX: Added 'ToothState' to imports for type safety in data transformations.
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment, Budget, ClinicalFinding, DentalTreatment, TreatmentApplication, ToothState } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENT_CATEGORIES } from '../constants';
 import {
-    DashboardIcon, AppointmentIcon, UsersIcon, MegaphoneIcon, SettingsIcon, PlusIcon, PencilIcon, TrashIcon, BriefcaseIcon, DentalIcon, MoonIcon, SunIcon, OdontogramIcon, ChevronDownIcon, CalendarIcon, WhatsappIcon, DollarSignIcon, SaveIcon
+    DashboardIcon, AppointmentIcon, UsersIcon, MegaphoneIcon, SettingsIcon, PlusIcon, PencilIcon, TrashIcon, BriefcaseIcon, DentalIcon, MoonIcon, SunIcon, OdontogramIcon, ChevronDownIcon, CalendarIcon, WhatsappIcon, DollarSignIcon, SaveIcon, PrintIcon, ClockIcon, CloseIcon
 } from './icons';
 import { AdminAppointmentModal } from './AdminAppointmentModal';
 import { AdminDoctorModal } from './AdminDoctorModal';
@@ -14,6 +16,7 @@ import { AgendaView } from './AgendaView';
 import { DoctorAvailabilityModal } from './DoctorAvailabilityModal';
 import { AdminPaymentModal } from './AdminPaymentModal';
 import { AdminTreatmentModal } from './AdminTreatmentModal';
+import { BudgetToPrint } from './BudgetToPrint';
 
 
 type AdminTab = 'dashboard' | 'agenda' | 'patients' | 'doctors' | 'promotions' | 'settings' | 'accounts' | 'services' | 'cotizaciones';
@@ -40,7 +43,8 @@ interface AdminPageProps {
     onUpdateBudget: (patientId: string, budgetId: string, data: Partial<Budget>) => void;
     setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
     onLogout: () => void;
-    onOpenClinicalRecord: (patient: Appointment, targetTab?: MainView) => void;
+    onOpenClinicalRecord: (patient: Appointment, targetTab?: MainView, initialEditBudgetId?: string) => void;
+    onSendToWhatsapp: (patient: Appointment, htmlContent: string, documentType: string) => Promise<boolean>;
 }
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode }> = ({ title, value, icon }) => (
@@ -161,71 +165,153 @@ const AdminAccountsView: React.FC<{
     );
 };
 
-const AdminBudgetsView: React.FC<{
-    patientRecords: Record<string, PatientRecord>;
-    appointments: Appointment[];
-    treatments: DentalTreatment[];
-    onUpdateBudget: (patientId: string, budgetId: string, data: Partial<Budget>) => void;
-}> = ({ patientRecords, appointments, treatments, onUpdateBudget }) => {
-    
-    const [editingBudget, setEditingBudget] = useState<{ id: string; patientId: string; status: Budget['status']; followUpDate: string } | null>(null);
+interface BudgetFollowUpModalProps {
+    budget: { id: string, patientId: string, notes?: string, followUpDate?: string };
+    onClose: () => void;
+    onSave: (patientId: string, budgetId: string, data: { notes: string; followUpDate?: string }) => void;
+}
 
-    const treatmentsMap = useMemo(() => treatments.reduce((acc, treatment) => ({ ...acc, [treatment.id]: treatment }), {} as Record<string, DentalTreatment>), [treatments]);
+const BudgetFollowUpModal: React.FC<BudgetFollowUpModalProps> = ({ budget, onClose, onSave }) => {
+    const [followUpDate, setFollowUpDate] = useState(budget.followUpDate ? new Date(budget.followUpDate).toISOString().slice(0, 10) : '');
+    const [notes, setNotes] = useState(budget.notes || '');
+
+    const handleSave = () => {
+        onSave(budget.patientId, budget.id, {
+            notes,
+            followUpDate: followUpDate ? new Date(followUpDate).toISOString() : undefined,
+        });
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md">
+                <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Editar Seguimiento</h2>
+                    <button onClick={onClose}><CloseIcon /></button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="text-sm font-medium">Fecha de Seguimiento</label>
+                        <input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)} className="w-full mt-1 p-2 text-sm rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium">Notas de Seguimiento</label>
+                        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} className="w-full mt-1 p-2 text-sm rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600" />
+                    </div>
+                </div>
+                <div className="p-4 border-t bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-2">
+                    <button onClick={onClose}>Cancelar</button>
+                    <button onClick={handleSave} className="bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface BudgetActionModalProps {
+    budget: Budget & { patientName: string };
+    patient: Appointment;
+    findings: ClinicalFinding[];
+    onClose: () => void;
+    onSendToWhatsapp: (patient: Appointment, htmlContent: string, documentType: string) => Promise<boolean>;
+    doctors: Doctor[];
+    settings: AppSettings;
+    treatments: DentalTreatment[];
+}
+
+const BudgetActionModal: React.FC<BudgetActionModalProps> = ({ budget, patient, findings, onClose, onSendToWhatsapp, doctors, settings, treatments }) => {
+    const [isSending, setIsSending] = useState(false);
+    
+    useEffect(() => {
+        // This effect handles printing when the modal is opened for that purpose.
+        const handlePrint = () => {
+            const printContent = document.getElementById('budget-to-print');
+            if (printContent) {
+                const docTitle = `Presupuesto - ${patient.name}`;
+                const winPrint = window.open('', '', 'width=900,height=650');
+                if (winPrint) {
+                    document.title = docTitle;
+                    winPrint.document.write(`<html><head><title>${docTitle}</title><script src="https://cdn.tailwindcss.com"></script><style>@media print { @page { size: A4; margin: 0; } body { -webkit-print-color-adjust: exact; } }</style></head><body>`);
+                    winPrint.document.write(printContent.innerHTML);
+                    winPrint.document.write('</body></html>');
+                    winPrint.document.close();
+                    winPrint.focus();
+                    setTimeout(() => {
+                        winPrint.print();
+                        winPrint.close();
+                        document.title = 'Kiru Consultorio Dental';
+                        onClose();
+                    }, 500);
+                }
+            }
+        };
+
+        handlePrint();
+    }, []);
+
+    const handleSend = async () => {
+        const printContent = document.getElementById('budget-to-print');
+        if (!printContent) return;
+        setIsSending(true);
+        const success = await onSendToWhatsapp(patient, printContent.innerHTML, 'budget');
+        if (success) {
+            alert('Presupuesto enviado con éxito.');
+        }
+        setIsSending(false);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
+                <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
+                    <h2 className="text-xl font-bold">Vista Previa: {budget.name}</h2>
+                    <button onClick={onClose}><CloseIcon /></button>
+                </div>
+                <div className="flex-1 overflow-y-auto bg-slate-200 dark:bg-slate-900 p-8">
+                    <div id="budget-to-print" className="shadow-lg">
+                        <BudgetToPrint budget={budget} patientName={patient.name} findings={findings} doctors={doctors} settings={settings} treatments={treatments} />
+                    </div>
+                </div>
+                <div className="p-4 flex justify-end space-x-2 bg-slate-50 dark:bg-slate-800/50 border-t">
+                    <button onClick={onClose}>Cancelar</button>
+                    <button onClick={handleSend} disabled={isSending} className="bg-green-600 text-white font-semibold px-4 py-2 rounded-lg flex items-center space-x-2 disabled:bg-slate-400">
+                        <WhatsappIcon />
+                        <span>{isSending ? 'Enviando...' : 'Enviar por WhatsApp'}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const AdminBudgetsView: React.FC<Omit<AdminPageProps, 'onLogout' | 'setSettings' | 'promotions' | 'onSaveAppointment' | 'onDeleteAppointment' | 'onSaveDoctor' | 'onDeleteDoctor' | 'onSavePromotion' | 'onDeletePromotion' | 'onTogglePromotionStatus' | 'onSaveTreatment' | 'onDeleteTreatment'>> = ({
+    patientRecords, appointments, treatments, onUpdateBudget, onOpenClinicalRecord, onSendToWhatsapp, doctors, settings
+}) => {
+    const [expandedBudgetId, setExpandedBudgetId] = useState<string | null>(null);
+    const [actionModalData, setActionModalData] = useState<{ budget: any; patient: Appointment; } | null>(null);
+    const [followUpModalData, setFollowUpModalData] = useState<any | null>(null);
+
+    const treatmentsMap = useMemo(() => treatments.reduce((acc, t) => ({...acc, [t.id]: t }), {} as Record<string, DentalTreatment>), [treatments]);
+    const patientMap = useMemo(() => appointments.reduce((acc, app) => ({...acc, [app.id]: app }), {} as Record<string, Appointment>), [appointments]);
+    // FIX: Added explicit types for 'r' and 't' to resolve 'Property does not exist on type unknown' errors.
+    const allFindings = useMemo(() => Object.values(patientRecords).flatMap((r: PatientRecord) => [...Object.values(r.permanentOdontogram).flatMap((t: ToothState) => t.findings), ...Object.values(r.deciduousOdontogram).flatMap((t: ToothState) => t.findings)]), [patientRecords]);
 
     const allBudgets = useMemo(() => {
-        const patientMap = appointments.reduce((acc, app) => ({ ...acc, [app.id]: app }), {} as Record<string, Appointment>);
-        
-        // FIX: Added explicit types for 'record' and 'tooth' to resolve 'Property does not exist on type unknown' errors.
-        const allFindings = Object.values(patientRecords).flatMap((record: PatientRecord) => [
-            ...Object.values(record.permanentOdontogram).flatMap((tooth: ToothState) => tooth.findings),
-            ...Object.values(record.deciduousOdontogram).flatMap((tooth: ToothState) => tooth.findings)
-        ]);
-        const findingsMap = allFindings.reduce((acc, f) => ({ ...acc, [f.id]: f }), {} as Record<string, ClinicalFinding>);
-
         // FIX: Added explicit type for 'record' to resolve 'Property does not exist on type unknown' errors.
         return Object.values(patientRecords).flatMap((record: PatientRecord) =>
             (record.budgets || []).map(budget => {
                 const total = budget.proposedSessions.flatMap(s => s.findingIds).reduce((acc, findingId) => {
-                    const finding = findingsMap[findingId];
+                    const finding = allFindings.find(f => f.id === findingId);
                     return acc + (finding ? treatmentsMap[finding.condition]?.price || 0 : 0);
                 }, 0);
-                
-                return {
-                    ...budget,
-                    patientId: record.patientId,
-                    patientName: patientMap[record.patientId]?.name || 'N/A',
-                    total,
-                };
+                return { ...budget, patientId: record.patientId, patientName: patientMap[record.patientId]?.name || 'N/A', total };
             })
         ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [patientRecords, appointments, treatmentsMap]);
+    }, [patientRecords, patientMap, allFindings, treatmentsMap]);
 
-    const handleEditClick = (budget: typeof allBudgets[0]) => {
-        setEditingBudget({
-            id: budget.id,
-            patientId: budget.patientId,
-            status: budget.status,
-            followUpDate: budget.followUpDate ? new Date(budget.followUpDate).toISOString().slice(0, 10) : '',
-        });
-    };
-
-    const handleSaveEdit = () => {
-        if (editingBudget) {
-            onUpdateBudget(editingBudget.patientId, editingBudget.id, {
-                status: editingBudget.status,
-                followUpDate: editingBudget.followUpDate ? new Date(editingBudget.followUpDate).toISOString() : undefined,
-            });
-            setEditingBudget(null);
-        }
-    };
-    
-    const handleEditingChange = (field: 'status' | 'followUpDate', value: string) => {
-        if (editingBudget) {
-            setEditingBudget(prev => ({ ...prev!, [field]: value }));
-        }
-    };
-
-    const statusConfig: Record<Budget['status'], { text: string; bg: string; text_color: string; }> = {
+    const statusConfig = {
         proposed: { text: 'Propuesto', bg: 'bg-yellow-100 dark:bg-yellow-900/40', text_color: 'text-yellow-800 dark:text-yellow-300' },
         accepted: { text: 'Aceptado', bg: 'bg-green-100 dark:bg-green-900/40', text_color: 'text-green-800 dark:text-green-300' },
         rejected: { text: 'Rechazado', bg: 'bg-red-100 dark:bg-red-900/40', text_color: 'text-red-800 dark:text-red-300' },
@@ -234,60 +320,47 @@ const AdminBudgetsView: React.FC<{
     return (
         <div>
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Gestión de Cotizaciones</h2>
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-x-auto border border-slate-200 dark:border-slate-700">
-                <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
-                     <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700">
-                        <tr>
-                            <th className="px-4 py-3">Paciente</th>
-                            <th className="px-4 py-3">Nombre Cotización</th>
-                            <th className="px-4 py-3">Estado</th>
-                            <th className="px-4 py-3 text-right">Monto</th>
-                            <th className="px-4 py-3">Fecha Seguimiento</th>
-                            <th className="px-4 py-3 text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {allBudgets.map(budget => {
-                            const isEditing = editingBudget?.id === budget.id;
-                            return (
-                                <tr key={budget.id} className={`border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 ${isEditing ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
-                                    <td className="px-4 py-2 font-medium text-slate-900 dark:text-white">{budget.patientName}</td>
-                                    <td className="px-4 py-2">{budget.name}</td>
-                                    <td className="px-4 py-2">
-                                        {isEditing ? (
-                                            <select value={editingBudget!.status} onChange={e => handleEditingChange('status', e.target.value)} className="p-1 text-xs rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600">
-                                                <option value="proposed">Propuesto</option>
-                                                <option value="accepted">Aceptado</option>
-                                                <option value="rejected">Rechazado</option>
-                                            </select>
-                                        ) : (
-                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusConfig[budget.status].bg} ${statusConfig[budget.status].text_color}`}>{statusConfig[budget.status].text}</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-2 text-right font-semibold">S/ {budget.total.toFixed(2)}</td>
-                                    <td className="px-4 py-2">
-                                        {isEditing ? (
-                                            <input type="date" value={editingBudget!.followUpDate} onChange={e => handleEditingChange('followUpDate', e.target.value)} className="p-1 text-xs rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600"/>
-                                        ) : (
-                                            budget.followUpDate ? new Date(budget.followUpDate).toLocaleDateString() : 'N/A'
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-2 text-center">
-                                        {isEditing ? (
-                                            <div className="flex items-center justify-center space-x-2">
-                                                <button onClick={handleSaveEdit} className="p-1.5 text-green-500 hover:bg-green-100 rounded-full"><SaveIcon className="w-5 h-5"/></button>
-                                                <button onClick={() => setEditingBudget(null)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-full"><TrashIcon className="w-5 h-5"/></button>
-                                            </div>
-                                        ) : (
-                                            <button onClick={() => handleEditClick(budget)} className="p-1.5 text-yellow-500 hover:bg-yellow-100 dark:hover:bg-slate-600 rounded-full"><PencilIcon className="w-5 h-5"/></button>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+            <div className="space-y-4">
+                {allBudgets.map(budget => (
+                    <div key={budget.id} className="bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700">
+                        <div className="p-4 flex items-center cursor-pointer" onClick={() => setExpandedBudgetId(prev => prev === budget.id ? null : budget.id)}>
+                            <div className="flex-1 grid grid-cols-5 gap-4 items-center">
+                                <span className="font-semibold">{budget.patientName}</span>
+                                <span>{budget.name}</span>
+                                <span><span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusConfig[budget.status].bg} ${statusConfig[budget.status].text_color}`}>{statusConfig[budget.status].text}</span></span>
+                                <span className="font-semibold text-right">S/ {budget.total.toFixed(2)}</span>
+                                <span>{budget.followUpDate ? `Seguimiento: ${new Date(budget.followUpDate).toLocaleDateString()}` : 'Sin seguimiento'}</span>
+                            </div>
+                            <ChevronDownIcon className={`ml-4 transition-transform ${expandedBudgetId === budget.id ? 'rotate-180' : ''}`} />
+                        </div>
+                        {expandedBudgetId === budget.id && (
+                            <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                    <div>
+                                        <h4 className="font-semibold text-sm">Sesiones</h4>
+                                        {budget.proposedSessions.map(s => <p key={s.id} className="text-sm">{s.name}</p>)}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-sm">Observaciones</h4>
+                                        <p className="text-sm whitespace-pre-wrap">{budget.observations || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-sm">Seguimiento</h4>
+                                        <p className="text-sm">{budget.notes || 'Sin notas.'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end space-x-2">
+                                    <button onClick={() => onOpenClinicalRecord(patientMap[budget.patientId], 'plan', budget.id)} className="text-sm font-semibold bg-yellow-500 text-white px-3 py-1.5 rounded-lg">Editar Plan Completo</button>
+                                    <button onClick={() => setFollowUpModalData(budget)} className="text-sm font-semibold bg-blue-500 text-white px-3 py-1.5 rounded-lg">Editar Seguimiento</button>
+                                    <button onClick={() => setActionModalData({ budget, patient: patientMap[budget.patientId] })} className="text-sm font-semibold bg-slate-500 text-white px-3 py-1.5 rounded-lg">Imprimir/Enviar</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
+            {actionModalData && <BudgetActionModal {...actionModalData} findings={allFindings} onClose={() => setActionModalData(null)} onSendToWhatsapp={onSendToWhatsapp} doctors={doctors} settings={settings} treatments={treatments} />}
+            {followUpModalData && <BudgetFollowUpModal budget={followUpModalData} onClose={() => setFollowUpModalData(null)} onSave={(patientId, budgetId, data) => onUpdateBudget(patientId, budgetId, data)} />}
         </div>
     );
 };
@@ -1003,6 +1076,10 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                     appointments={props.appointments}
                     treatments={props.treatments}
                     onUpdateBudget={props.onUpdateBudget}
+                    onOpenClinicalRecord={props.onOpenClinicalRecord}
+                    onSendToWhatsapp={props.onSendToWhatsapp}
+                    doctors={props.doctors}
+                    settings={props.settings}
                 />;
             case 'services':
                 return <AdminTreatmentsView 

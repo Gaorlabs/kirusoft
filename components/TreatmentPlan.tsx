@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Session, AppliedTreatment, ClinicalFinding, Budget, ProposedSession, Doctor, DentalTreatment } from '../types';
 import { CheckIcon, UndoIcon, PlusIcon, TrashIcon, SaveIcon, CalendarIcon, ChevronDownIcon, PrintIcon, PencilIcon, ClockIcon } from './icons';
@@ -448,9 +449,10 @@ interface BudgetManagerProps {
     onPrintBudget: (budget: Budget) => void;
     doctors: Doctor[];
     treatments: DentalTreatment[];
+    initialEditBudgetId?: string;
 }
 
-const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, findings, onSaveOrUpdateBudget, onActivateBudget, onUpdateBudget, onPrintBudget, doctors, treatments }) => {
+const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, findings, onSaveOrUpdateBudget, onActivateBudget, onUpdateBudget, onPrintBudget, doctors, treatments, initialEditBudgetId }) => {
     const [builderMode, setBuilderMode] = useState<'new' | 'edit' | 'closed'>('closed');
     const [budgetToEdit, setBudgetToEdit] = useState<Budget | null>(null);
 
@@ -465,6 +467,15 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, findings, onSave
         setBudgetToEdit(budget);
         setBuilderMode('edit');
     };
+
+    useEffect(() => {
+        if (initialEditBudgetId) {
+            const budget = budgets.find(b => b.id === initialEditBudgetId);
+            if (budget) {
+                handleEdit(budget);
+            }
+        }
+    }, [initialEditBudgetId, budgets]);
 
     const handleSave = (budgetData: Partial<Budget> & { proposedSessions: Omit<ProposedSession, 'id'>[] }) => {
         onSaveOrUpdateBudget(budgetData);
@@ -512,9 +523,10 @@ interface TreatmentPlanProps {
     onPrintBudget: (budget: Budget) => void;
     doctors: Doctor[];
     treatments: DentalTreatment[];
+    initialEditBudgetId?: string;
 }
 
-export const TreatmentPlan: React.FC<TreatmentPlanProps> = ({ sessions, findings, budgets, onSaveOrUpdateBudget, onActivateBudget, onToggleTreatmentStatus, onUpdateBudget, onPrintBudget, doctors, treatments }) => {
+export const TreatmentPlan: React.FC<TreatmentPlanProps> = ({ sessions, findings, budgets, onSaveOrUpdateBudget, onActivateBudget, onToggleTreatmentStatus, onUpdateBudget, onPrintBudget, doctors, treatments, initialEditBudgetId }) => {
     const hasActivePlan = sessions.length > 0;
     const hasBudgets = budgets.length > 0;
     const hasFindings = findings.length > 0;
@@ -543,7 +555,8 @@ export const TreatmentPlan: React.FC<TreatmentPlanProps> = ({ sessions, findings
                     onUpdateBudget={onUpdateBudget} 
                     onPrintBudget={onPrintBudget} 
                     doctors={doctors} 
-                    treatments={treatments} 
+                    treatments={treatments}
+                    initialEditBudgetId={initialEditBudgetId}
                 />
             )}
 

@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
@@ -183,6 +184,7 @@ function App() {
     
     const [currentPatientIndex, setCurrentPatientIndex] = useState<number | null>(null);
     const [initialTabForConsultation, setInitialTabForConsultation] = useState<MainView | undefined>();
+    const [initialEditBudgetId, setInitialEditBudgetId] = useState<string | undefined>();
     
     // State for booking flow modals using a state machine
     const [bookingStage, setBookingStage] = useState<BookingStage>('idle');
@@ -253,10 +255,11 @@ function App() {
         alert(`¡Cita solicitada para ${newAppointment.name}!\nPor favor, completa el pago en la clínica para confirmar tu cita.`);
     };
 
-    const handleOpenClinicalRecord = (patient: Appointment, targetTab?: MainView) => {
+    const handleOpenClinicalRecord = (patient: Appointment, targetTab?: MainView, budgetIdToEdit?: string) => {
         const patientIndex = sortedAppointments.findIndex(p => p.id === patient.id);
         setCurrentPatientIndex(patientIndex);
         setInitialTabForConsultation(targetTab);
+        setInitialEditBudgetId(budgetIdToEdit);
         setPage('consultation');
     };
     
@@ -524,6 +527,7 @@ function App() {
                 setSettings={setSettings}
                 onLogout={handleLogout}
                 onOpenClinicalRecord={handleOpenClinicalRecord}
+                onSendToWhatsapp={handleSendToWhatsapp}
             />
         );
     } else if (page === 'consultation' && isAuthenticated && currentPatient && currentPatientRecord) {
@@ -539,6 +543,7 @@ function App() {
                 onSavePayment={handleSavePayment}
                 onDeletePayment={handleDeletePayment}
                 initialTab={initialTabForConsultation}
+                initialEditBudgetId={initialEditBudgetId}
                 doctors={doctors}
                 settings={settings}
                 treatments={treatments}

@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Odontogram } from './Odontogram';
@@ -37,6 +38,7 @@ interface ConsultationRoomProps {
     onSavePayment: (paymentData: { patientId: string; amount: number; method: string; date: string; id?: string }) => void;
     onDeletePayment: (paymentId: string, patientId: string) => void;
     initialTab?: MainView;
+    initialEditBudgetId?: string;
     doctors: Doctor[];
     settings: AppSettings;
     treatments: DentalTreatment[];
@@ -54,7 +56,8 @@ export function ConsultationRoom({
     isLastPatient, 
     onSavePayment, 
     onDeletePayment, 
-    initialTab, 
+    initialTab,
+    initialEditBudgetId, 
     doctors, 
     settings, 
     treatments,
@@ -687,7 +690,7 @@ export function ConsultationRoom({
                                 </div>
                             </div>
                         )}
-                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveOrUpdateBudget={handleSaveOrUpdateBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} onUpdateBudget={handleUpdateBudget} onPrintBudget={(budget) => handleDocumentAction('print', 'budget', budget)} treatments={treatments} />}
+                         {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSaveOrUpdateBudget={handleSaveOrUpdateBudget} onActivateBudget={handleActivateBudget} onToggleTreatmentStatus={handleToggleTreatmentStatus} budgets={record.budgets} doctors={doctors} onUpdateBudget={handleUpdateBudget} onPrintBudget={(budget) => handleDocumentAction('print', 'budget', budget)} treatments={treatments} initialEditBudgetId={initialEditBudgetId} />}
                          {activeView === 'history' && <ClinicalHistory sessions={record.sessions} onUpdateSession={handleUpdateSession} treatments={treatments} />}
                          {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} doctors={doctors} treatments={allCompletedTreatments} onAction={handleDocumentAction} isSending={isSending} />}
                          {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} patientName={patient.name} doctors={doctors} onAction={handleDocumentAction} isSending={isSending} />}
