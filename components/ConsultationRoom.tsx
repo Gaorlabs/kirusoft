@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Odontogram } from './Odontogram';
@@ -660,7 +661,7 @@ export function ConsultationRoom({
                                         onEditFinding={handleEditFindingClick}
                                         treatments={treatments}
                                     />
-                                     {allFindings.length > 0 && !record.sessions.length && (
+                                     {allFindings.length > 0 && (
                                         <div className="mt-6 text-center">
                                             <button
                                                 onClick={() => setActiveView('plan')}

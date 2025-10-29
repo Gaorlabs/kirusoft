@@ -526,21 +526,36 @@ export const TreatmentPlan: React.FC<TreatmentPlanProps> = ({ sessions, findings
         }, {} as Record<string, DentalTreatment>), 
     [treatments]);
 
-    if (hasActivePlan) {
-        return <TreatmentPlanDisplay sessions={sessions} treatmentsMap={treatmentsMap} onToggleTreatmentStatus={onToggleTreatmentStatus} />;
-    }
-
-    if (hasBudgets || hasFindings) {
-        return <BudgetManager budgets={budgets} findings={findings} onSaveOrUpdateBudget={onSaveOrUpdateBudget} onActivateBudget={onActivateBudget} onUpdateBudget={onUpdateBudget} onPrintBudget={onPrintBudget} doctors={doctors} treatments={treatments} />;
-    }
-
     return (
         <div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-200 mb-4">Presupuestos y Plan de Tratamiento</h3>
-            <div className="text-center p-6 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
-                <p className="text-gray-500 dark:text-gray-400">No hay hallazgos clínicos para planificar.</p>
-                <p className="text-sm text-gray-400 mt-1">Registre hallazgos en el odontograma para crear un presupuesto.</p>
-            </div>
+            {hasActivePlan && (
+                <div className="mb-8">
+                    <TreatmentPlanDisplay sessions={sessions} treatmentsMap={treatmentsMap} onToggleTreatmentStatus={onToggleTreatmentStatus} />
+                </div>
+            )}
+
+            {(hasBudgets || hasFindings) && (
+                <BudgetManager 
+                    budgets={budgets} 
+                    findings={findings} 
+                    onSaveOrUpdateBudget={onSaveOrUpdateBudget} 
+                    onActivateBudget={onActivateBudget} 
+                    onUpdateBudget={onUpdateBudget} 
+                    onPrintBudget={onPrintBudget} 
+                    doctors={doctors} 
+                    treatments={treatments} 
+                />
+            )}
+
+            {!hasActivePlan && !hasBudgets && !hasFindings && (
+                 <div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-200 mb-4">Presupuestos y Plan de Tratamiento</h3>
+                    <div className="text-center p-6 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
+                        <p className="text-gray-500 dark:text-gray-400">No hay hallazgos clínicos para planificar.</p>
+                        <p className="text-sm text-gray-400 mt-1">Registre hallazgos en el odontograma para crear un presupuesto.</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
