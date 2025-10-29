@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
@@ -163,7 +164,7 @@ const AdminDashboardView: React.FC<{
         activePatientsCount,
         totalProposedValue,
         totalRevenue
-    // FIX: Refactored `useMemo` to use a more functional approach, calculating totals directly instead of using mutable variables with `+=`. This prevents potential type-related arithmetic errors.
+    // FIX: Refactored `useMemo` to use a more functional approach with `reduce`, calculating totals directly instead of using mutable variables with `+=`. This prevents potential type-related arithmetic errors.
     } = useMemo(() => {
         const today = new Date().toDateString();
         const todaysAppointments = appointments.filter(a => new Date(a.dateTime).toDateString() === today);

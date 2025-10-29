@@ -1,78 +1,15 @@
 
+
 import React, { useState } from 'react';
-import type { Appointment, PatientRecord } from '../types';
-import { UserIcon, PhoneIcon, EmailIcon, CalendarIcon, PencilIcon, CloseIcon, PlusIcon, TrashIcon } from './icons';
+import type { Appointment, PatientRecord, MedicalHistory } from '../types';
+import { UserIcon, PhoneIcon, EmailIcon, PencilIcon, ClipboardListIcon } from './icons';
+import { MedicalHistoryModal } from './MedicalHistoryModal';
 
-const MedicalAlertsModal: React.FC<{
-    alerts: string[];
-    onClose: () => void;
-    onSave: (alerts: string[]) => void;
-}> = ({ alerts, onClose, onSave }) => {
-    const [currentAlerts, setCurrentAlerts] = useState(alerts);
-    const [newAlert, setNewAlert] = useState('');
-
-    const handleAddAlert = () => {
-        if (newAlert.trim() && !currentAlerts.includes(newAlert.trim())) {
-            setCurrentAlerts([...currentAlerts, newAlert.trim()]);
-            setNewAlert('');
-        }
-    };
-
-    const handleRemoveAlert = (alertToRemove: string) => {
-        setCurrentAlerts(currentAlerts.filter(alert => alert !== alertToRemove));
-    };
-
-    const handleSave = () => {
-        onSave(currentAlerts);
-        onClose();
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
-                <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Editar Alertas Médicas</h2>
-                    <button onClick={onClose} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"><CloseIcon /></button>
-                </div>
-                <div className="p-6 flex-1 overflow-y-auto">
-                    <div className="flex gap-2 mb-4">
-                        <input
-                            type="text"
-                            value={newAlert}
-                            onChange={(e) => setNewAlert(e.target.value)}
-                            placeholder="Añadir nueva alerta..."
-                            className="flex-grow block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white"
-                        />
-                        <button onClick={handleAddAlert} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 font-semibold flex items-center justify-center">
-                            <PlusIcon className="w-5 h-5" />
-                        </button>
-                    </div>
-                    <div className="space-y-2">
-                        {currentAlerts.length > 0 ? currentAlerts.map((alert, index) => (
-                            <div key={index} className="flex justify-between items-center p-2 bg-slate-100 dark:bg-slate-700/50 rounded-md">
-                                <span className="text-sm">{alert}</span>
-                                <button onClick={() => handleRemoveAlert(alert)} className="text-red-500 hover:text-red-700">
-                                    <TrashIcon className="w-4 h-4" />
-                                </button>
-                            </div>
-                        )) : (
-                            <p className="text-center text-slate-500 dark:text-slate-400 text-sm">No hay alertas.</p>
-                        )}
-                    </div>
-                </div>
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
-                    <button type="button" onClick={onClose} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 py-2 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold">Cancelar</button>
-                    <button type="button" onClick={handleSave} className="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 font-semibold">Guardar</button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 interface PatientFileProps {
     patient: Appointment | null;
     record: PatientRecord;
-    onUpdateMedicalAlerts: (alerts: string[]) => void;
+    onUpdateMedicalHistory: (history: MedicalHistory) => void;
 }
 
 const InfoCard: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => (
@@ -85,8 +22,34 @@ const InfoCard: React.FC<{ label: string; value: string; icon: React.ReactNode }
     </div>
 );
 
-export const PatientFile: React.FC<PatientFileProps> = ({ patient, record, onUpdateMedicalAlerts }) => {
-    const [isEditingAlerts, setIsEditingAlerts] = useState(false);
+const HistorySection: React.FC<{ title: string; items: string[]; color: 'red' | 'yellow' | 'blue' | 'green' | 'gray' }> = ({ title, items, color }) => {
+    if (items.length === 0) return null;
+    
+    const colorClasses = {
+        red: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300',
+        yellow: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300',
+        blue: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+        green: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300',
+        gray: 'bg-gray-100 dark:bg-gray-700/60 text-gray-800 dark:text-gray-300',
+    };
+
+    return (
+        <div>
+            <h4 className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 mb-2">{title}</h4>
+            <div className="flex flex-wrap gap-2">
+                {items.map((item, index) => (
+                    <span key={index} className={`px-2 py-1 text-xs font-semibold rounded-full ${colorClasses[color]}`}>
+                        {item}
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+
+export const PatientFile: React.FC<PatientFileProps> = ({ patient, record, onUpdateMedicalHistory }) => {
+    const [isEditingHistory, setIsEditingHistory] = useState(false);
 
     if (!patient) {
         return (
@@ -96,6 +59,14 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patient, record, onUpd
         );
     }
     
+    const { medicalHistory } = record;
+    const hasHistory = medicalHistory.systemicDiseases.length > 0 ||
+                       medicalHistory.pastSurgeries.length > 0 ||
+                       medicalHistory.allergies.length > 0 ||
+                       medicalHistory.currentMedications.length > 0 ||
+                       medicalHistory.habits.length > 0 ||
+                       medicalHistory.familyHistory.trim() !== '';
+
     return (
         <div className="space-y-6">
             <div>
@@ -110,18 +81,31 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patient, record, onUpd
             
             <div>
                 <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300">Alertas Médicas</h3>
-                    <button onClick={() => setIsEditingAlerts(true)} className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Editar Alertas Médicas">
+                     <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 flex items-center space-x-2">
+                        <ClipboardListIcon className="w-5 h-5 text-gray-400" />
+                        <span>Anamnesis / Historial Médico</span>
+                     </h3>
+                    <button onClick={() => setIsEditingHistory(true)} className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-slate-700 rounded-full transition-colors" title="Editar Historial Médico">
                         <PencilIcon className="w-4 h-4" />
                     </button>
                 </div>
-                {record.medicalAlerts.length > 0 ? (
-                     <div className="p-3 text-sm bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded-lg border border-yellow-200 dark:border-yellow-800/50">
-                        {record.medicalAlerts.join(', ')}
+                {hasHistory ? (
+                     <div className="p-3 space-y-4 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <HistorySection title="Alergias" items={medicalHistory.allergies} color="red" />
+                        <HistorySection title="Enfermedades Sistémicas" items={medicalHistory.systemicDiseases} color="yellow" />
+                        <HistorySection title="Medicación Actual" items={medicalHistory.currentMedications} color="blue" />
+                        <HistorySection title="Cirugías Previas" items={medicalHistory.pastSurgeries} color="gray" />
+                        <HistorySection title="Hábitos" items={medicalHistory.habits} color="gray" />
+                        {medicalHistory.familyHistory && (
+                             <div>
+                                <h4 className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 mb-1">Antecedentes Familiares</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-300">{medicalHistory.familyHistory}</p>
+                            </div>
+                        )}
                     </div>
                 ) : (
-                    <div className="p-3 text-sm bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700">
-                        No hay alertas registradas.
+                    <div className="p-3 text-sm text-center bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700">
+                        No hay historial médico registrado.
                     </div>
                 )}
             </div>
@@ -145,11 +129,14 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patient, record, onUpd
                     </div>
                 )}
             </div>
-            {isEditingAlerts && (
-                <MedicalAlertsModal
-                    alerts={record.medicalAlerts}
-                    onClose={() => setIsEditingAlerts(false)}
-                    onSave={onUpdateMedicalAlerts}
+            {isEditingHistory && (
+                <MedicalHistoryModal
+                    history={record.medicalHistory}
+                    onClose={() => setIsEditingHistory(false)}
+                    onSave={(newHistory) => {
+                        onUpdateMedicalHistory(newHistory);
+                        setIsEditingHistory(false);
+                    }}
                 />
             )}
         </div>

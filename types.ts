@@ -129,12 +129,21 @@ export interface Payment {
     method: string;
 }
 
+export interface MedicalHistory {
+    systemicDiseases: string[];
+    pastSurgeries: string[];
+    allergies: string[];
+    currentMedications: string[];
+    habits: string[];
+    familyHistory: string;
+}
+
 export interface PatientRecord {
     patientId: string;
     permanentOdontogram: OdontogramState;
     deciduousOdontogram: OdontogramState;
     sessions: Session[];
-    medicalAlerts: string[];
+    medicalHistory: MedicalHistory;
     prescriptions: Prescription[];
     consents: ConsentForm[];
     payments: Payment[];

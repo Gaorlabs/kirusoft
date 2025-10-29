@@ -6,7 +6,7 @@ import { LoginPage } from './components/LoginPage';
 import { AdminPage } from './components/AdminPage';
 import { ConsultationRoom } from './components/ConsultationRoom';
 // FIX: Corrected typo 'OdogramState' to 'OdontogramState'.
-import type { Appointment, Doctor, Promotion, AppSettings, PatientRecord, OdontogramState, Payment } from './types';
+import type { Appointment, Doctor, Promotion, AppSettings, PatientRecord, OdontogramState, Payment, MedicalHistory } from './types';
 import { DENTAL_SERVICES_MAP, ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS } from './constants';
 import { PaymentModal } from './components/PaymentModal';
 import { AppointmentForm } from './components/AppointmentForm';
@@ -14,6 +14,15 @@ import { AppointmentForm } from './components/AppointmentForm';
 const initialToothState = { surfaces: { buccal: [], lingual: [], occlusal: [], distal: [], mesial: [], root: [] }, whole: [], findings: [] };
 // FIX: Corrected typo 'OdogramState' to 'OdontogramState'.
 const createInitialOdontogram = (teeth: number[]): OdontogramState => teeth.reduce((acc, toothId) => ({ ...acc, [toothId]: structuredClone(initialToothState) }), {});
+
+const initialMedicalHistory: MedicalHistory = {
+    systemicDiseases: [],
+    pastSurgeries: [],
+    allergies: [],
+    currentMedications: [],
+    habits: [],
+    familyHistory: '',
+};
 
 // Mock data for initial state
 const MOCK_DOCTORS: Doctor[] = [
@@ -79,7 +88,7 @@ const MOCK_PATIENT_RECORDS: Record<string, PatientRecord> = {
                 { id: 'treat1', treatmentId: 'filling', toothId: 16, surface: 'occlusal', status: 'completed', sessionId: 'sess1' }
             ], date: new Date('2023-10-15').toISOString(), notes: 'Revisión inicial completa. Paciente presenta buena higiene bucal.', documents: [] }
         ],
-        medicalAlerts: ['Hipertensión controlada.'],
+        medicalHistory: { ...initialMedicalHistory, systemicDiseases: ['Hipertensión controlada.'] },
         prescriptions: [],
         consents: [],
         payments: [{ id: 'pay1', date: new Date('2023-10-15').toISOString(), amount: 120, method: 'Efectivo' }],
@@ -89,7 +98,7 @@ const MOCK_PATIENT_RECORDS: Record<string, PatientRecord> = {
         permanentOdontogram: createInitialOdontogram(ALL_TEETH_PERMANENT),
         deciduousOdontogram: createInitialOdontogram(ALL_TEETH_DECIDUOUS),
         sessions: [],
-        medicalAlerts: ['Alergia a la penicilina.'],
+        medicalHistory: { ...initialMedicalHistory, allergies: ['Alergia a la penicilina.'] },
         prescriptions: [],
         consents: [],
         payments: [],
@@ -249,7 +258,7 @@ function App() {
                 permanentOdontogram: createInitialOdontogram(ALL_TEETH_PERMANENT),
                 deciduousOdontogram: createInitialOdontogram(ALL_TEETH_DECIDUOUS),
                 sessions: [],
-                medicalAlerts: [],
+                medicalHistory: { ...initialMedicalHistory },
                 prescriptions: [],
                 consents: [],
                 payments: [],

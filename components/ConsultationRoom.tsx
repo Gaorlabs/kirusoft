@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Odontogram } from './Odontogram';
 import { Toolbar } from './Toolbar';
 import { TreatmentPlan } from './TreatmentPlan';
-import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor } from '../types';
+import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor, MedicalHistory } from '../types';
 import { ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, DENTAL_TREATMENTS, QUADRANTS_PERMANENT, QUADRANTS_DECIDUOUS, TREATMENTS_MAP } from '../constants';
 import { DentalIcon, SaveIcon, MoonIcon, SunIcon, CalendarIcon, ArrowLeftIcon, OdontogramIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, FileTextIcon, ClipboardListIcon, DollarSignIcon, PlusIcon } from './icons';
 import { ClinicalFindings } from './ClinicalFindings';
@@ -388,8 +388,8 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
         setRecord(prev => ({ ...prev, consents }));
     };
 
-    const handleUpdateMedicalAlerts = (medicalAlerts: string[]) => {
-        setRecord(prev => ({ ...prev, medicalAlerts }));
+    const handleUpdateMedicalHistory = (medicalHistory: MedicalHistory) => {
+        setRecord(prev => ({ ...prev, medicalHistory }));
     };
     
     const quadrants = isPermanent ? QUADRANTS_PERMANENT : QUADRANTS_DECIDUOUS;
@@ -437,7 +437,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
             </header>
             <div className="flex flex-1 overflow-hidden">
                 <aside className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 overflow-y-auto">
-                    <PatientFile patient={patient} record={record} onUpdateMedicalAlerts={handleUpdateMedicalAlerts} />
+                    <PatientFile patient={patient} record={record} onUpdateMedicalHistory={handleUpdateMedicalHistory} />
                 </aside>
                 
                 <main className="flex-1 flex flex-col p-4 overflow-hidden">
