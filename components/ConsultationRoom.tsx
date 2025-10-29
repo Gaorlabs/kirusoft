@@ -497,7 +497,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                          {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSavePlan={handleSavePlan} onToggleTreatmentStatus={handleToggleTreatmentStatus}/>}
                          {activeView === 'history' && <ClinicalHistory sessions={record.sessions} onUpdateSession={handleUpdateSession} />}
                          {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} doctors={doctors} treatments={allCompletedTreatments} />}
-                         {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} />}
+                         {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} patientName={patient.name} doctors={doctors} />}
                          {activeView === 'accounts' && <Accounts sessions={record.sessions} patientId={record.patientId} payments={record.payments} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} patientName={patient.name}/>}
                     </div>
                 </main>

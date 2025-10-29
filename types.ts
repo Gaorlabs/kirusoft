@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 export type ToothSurfaceName = 'buccal' | 'lingual' | 'occlusal' | 'distal' | 'mesial' | 'root';
@@ -95,12 +96,16 @@ export interface AppSettings {
     whatsappNumber: string;
 }
 
+export interface Medication {
+    name: string;
+    presentation: string;
+    dosage: string;
+}
+
 export interface Prescription {
     id: string;
     date: string;
-    medication: string;
-    presentation: string;
-    dosage: string;
+    medications: Medication[];
     recommendations: string;
     relatedTreatment?: string;
     doctorId: string;
@@ -110,8 +115,11 @@ export interface ConsentForm {
     id: string;
     templateId: string;
     title: string;
+    content: string;
     dateSigned: string | null;
     status: 'pending' | 'signed';
+    signatureDataUrl?: string;
+    doctorId?: string;
 }
 
 export interface Payment {

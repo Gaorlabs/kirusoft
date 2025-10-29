@@ -98,18 +98,22 @@ export const CONSENT_TEMPLATES = [
     {
         id: 'extraction',
         title: 'Consentimiento para Extracción Dental',
+        content: `Yo, [PACIENTE], por la presente autorizo al profesional a cargo y a su equipo a realizar el procedimiento de extracción dental.\n\nHe sido informado(a) sobre la naturaleza del procedimiento, los beneficios, los riesgos potenciales (incluyendo, pero no limitado a, dolor, hinchazón, infección, sangrado, daño a dientes adyacentes, y parestesia) y las alternativas al tratamiento.\n\nEntiendo que no hay garantías sobre el resultado del procedimiento y que se me han respondido todas mis preguntas a mi entera satisfacción.\n\nFecha: [FECHA]`
     },
     {
         id: 'endodontics',
         title: 'Consentimiento para Endodoncia',
+        content: `Yo, [PACIENTE], autorizo al profesional a cargo a realizar un tratamiento de conductos (endodoncia).\n\nSe me ha explicado que este procedimiento implica la remoción del tejido pulpar (nervio), la limpieza y desinfección de los conductos radiculares, y su posterior sellado.\n\nComprendo los riesgos, que incluyen la posibilidad de fractura del instrumento dentro del conducto, perforación de la raíz, y la posibilidad de que el tratamiento no elimine completamente la infección, pudiendo requerir un retratamiento o cirugía apical.\n\nConfirmo que he tenido la oportunidad de hacer preguntas y que estas han sido contestadas satisfactoriamente.\n\nFecha: [FECHA]`
     },
     {
         id: 'implant',
         title: 'Consentimiento para Implante Dental',
+        content: `Yo, [PACIENTE], doy mi consentimiento para la colocación de un implante dental.\n\nComprendo que este es un procedimiento quirúrgico para reemplazar una raíz dental perdida y que servirá como soporte para una futura corona. Se me han explicado los riesgos, incluyendo infección, fallo del implante en integrarse con el hueso, y daño a estructuras anatómicas cercanas.\n\nEntiendo el plan de tratamiento, los costos asociados y el tiempo de curación requerido.\n\nFecha: [FECHA]`
     },
     {
         id: 'cosmetic',
         title: 'Consentimiento para Procedimiento Cosmético',
+        content: `Yo, [PACIENTE], consiento en someterme a un procedimiento cosmético (ej. blanqueamiento, carillas).\n\nEntiendo que este es un tratamiento electivo para mejorar la estética de mi sonrisa y que los resultados pueden variar. He discutido mis expectativas con el profesional y comprendo los posibles riesgos, beneficios y alternativas.\n\nAcepto que los resultados no son permanentes y pueden requerir mantenimiento futuro.\n\nFecha: [FECHA]`
     },
 ];
 
@@ -118,6 +122,11 @@ export const COMMON_MEDICATIONS = [
     { name: 'Ibuprofeno', presentation: '400mg Tabletas', dosage: 'Tomar 1 tableta cada 6 horas si hay dolor.' },
     { name: 'Paracetamol', presentation: '500mg Tabletas', dosage: 'Tomar 1 tableta cada 8 horas para fiebre o dolor.' },
     { name: 'Clorhexidina enjuague bucal', presentation: '0.12% Solución', dosage: 'Realizar enjuagues con 15ml por 30 segundos, 2 veces al día.' },
+    { name: 'Clindamicina', presentation: '300mg Cápsulas', dosage: 'Tomar 1 cápsula cada 6 horas por 7 días.' },
+    { name: 'Ketorolaco', presentation: '10mg Tabletas', dosage: 'Tomar 1 tableta cada 8 horas por 3 días (máximo).' },
+    { name: 'Dexametasona', presentation: '4mg Tabletas', dosage: 'Tomar 1 tableta dosis única o según indicación profesional.' },
+    { name: 'Metronidazol', presentation: '500mg Tabletas', dosage: 'Tomar 1 tableta cada 8 horas por 7 días (usualmente combinado).' },
+    { name: 'Nistatina enjuague bucal', presentation: '100,000 U.I./mL Suspensión', dosage: 'Enjuagar con 5ml por 2 minutos y tragar, 4 veces al día.' },
 ];
 
 export const COMMON_RECOMMENDATIONS = [

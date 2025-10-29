@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+
+
+
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
 import {
@@ -89,13 +92,14 @@ const AdminAccountsView: React.FC<{
             }
         });
 
-        // FIX: Used Object.keys to iterate over patient records, ensuring proper type inference and preventing potential arithmetic errors.
-        Object.keys(patientRecords).forEach(patientId => {
-            const record = patientRecords[patientId];
+        // FIX: Used Object.values to iterate over patient records, ensuring proper type inference and preventing potential arithmetic errors.
+        // Also added an explicit type to `record` to avoid it being inferred as `unknown`.
+        Object.values(patientRecords).forEach((record: PatientRecord) => {
             const summary = summaries[record.patientId];
             if (summary) {
                 // FIX: Explicitly typing the accumulator and item parameters in `reduce` prevents type inference issues that can lead to arithmetic errors, especially when amounts might be strings from localStorage.
-                const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum: number, t: AppliedTreatment) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
+                // FIX: Defensively cast treatment price to a number to prevent arithmetic errors.
+                const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum: number, t: AppliedTreatment) => sum + (Number(TREATMENTS_MAP[t.treatmentId]?.price) || 0), 0);
                 // FIX: Explicitly type `p` as `Payment` and convert `p.amount` to a number to prevent arithmetic errors from string concatenation, which can occur with data from localStorage.
                 const paid = (record.payments || []).reduce((sum: number, p: Payment) => sum + (Number(p.amount) || 0), 0);
                 
@@ -159,25 +163,23 @@ const AdminDashboardView: React.FC<{
         activePatientsCount,
         totalProposedValue,
         totalRevenue
+    // FIX: Refactored `useMemo` to use a more functional approach, calculating totals directly instead of using mutable variables with `+=`. This prevents potential type-related arithmetic errors.
     } = useMemo(() => {
         const today = new Date().toDateString();
         const todaysAppointments = appointments.filter(a => new Date(a.dateTime).toDateString() === today);
         const uniquePatients = new Set(appointments.map(a => a.email));
 
-        let proposedValue = 0;
-        let revenue = 0;
-        
-        // FIX: Switched to Object.values to get properly typed records, fixing an 'unknown' type error on 'record'.
-        Object.values(patientRecords).forEach(record => {
-            // FIX: Explicitly typed `sum` and `t` in the `reduce` function to resolve a potential type inference issue that could cause an arithmetic error.
-            proposedValue += (record.sessions || [])
-                .flatMap(s => s.treatments)
-                .filter(t => t.status === 'proposed')
-                .reduce((sum: number, t: AppliedTreatment) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
+        const allRecords = Object.values(patientRecords);
 
-            // FIX: Replaced `forEach` with `reduce` to prevent potential type inference issues with the `+=` operator. This ensures the sum is correctly calculated as a number, resolving the arithmetic error.
-            revenue += (record.payments || []).reduce((sum: number, payment: Payment) => sum + (Number(payment.amount) || 0), 0);
-        });
+        const proposedValue = allRecords
+            .flatMap((record: PatientRecord) => record.sessions || [])
+            .flatMap(s => s.treatments)
+            .filter(t => t.status === 'proposed')
+            .reduce((sum: number, t: AppliedTreatment) => sum + (Number(TREATMENTS_MAP[t.treatmentId]?.price) || 0), 0);
+        
+        const revenue = allRecords
+            .flatMap((record: PatientRecord) => record.payments || [])
+            .reduce((sum: number, payment: Payment) => sum + (Number(payment.amount) || 0), 0);
 
         return {
             todaysAppointmentsCount: todaysAppointments.length,
@@ -197,15 +199,17 @@ const AdminDashboardView: React.FC<{
         const initialDailyTotals: Record<string, number> = last7Days.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
 
         // FIX: Refactored to use `reduce` for calculating daily totals. This functional approach is more robust, consistent with other calculations in the component, and resolves the arithmetic error by avoiding mutation inside a loop.
+        // Also added an explicit type to `record` to avoid it being inferred as `unknown`.
         const dailyTotals = Object.values(patientRecords)
-            .flatMap(record => record.payments || [])
-            .reduce((totals, payment) => {
+            .flatMap((record: PatientRecord) => record.payments || [])
+            .reduce((totals: Record<string, number>, payment: Payment) => {
                 const paymentDay = new Date(payment.date).toDateString();
                 if (Object.prototype.hasOwnProperty.call(totals, paymentDay)) {
-                    // FIX: Replaced mutating reduce with an immutable update to resolve arithmetic error and follow functional best practices.
+                    // FIX: Replaced mutating forEach with an immutable update using reduce to resolve arithmetic error and follow functional best practices.
+                    // FIX: Resolved an arithmetic error by providing a fallback to 0 for `totals[paymentDay]`, as indexed access on an object can result in `undefined`.
                     return {
                         ...totals,
-                        [paymentDay]: totals[paymentDay] + (Number(payment.amount) || 0),
+                        [paymentDay]: (totals[paymentDay] || 0) + (Number(payment.amount) || 0),
                     };
                 }
                 return totals;

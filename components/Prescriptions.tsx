@@ -1,7 +1,8 @@
 
+
 import React, { useState, useRef, useMemo } from 'react';
-import type { Prescription, Doctor } from '../types';
-import { PlusIcon, FileTextIcon, CloseIcon, PrintIcon, DentalIcon } from './icons';
+import type { Prescription, Doctor, Medication } from '../types';
+import { PlusIcon, FileTextIcon, CloseIcon, PrintIcon, DentalIcon, TrashIcon } from './icons';
 import { COMMON_MEDICATIONS, COMMON_RECOMMENDATIONS } from '../constants';
 
 interface PrescriptionModalProps {
@@ -12,59 +13,69 @@ interface PrescriptionModalProps {
 }
 
 const PrescriptionModal: React.FC<PrescriptionModalProps> = ({ onClose, onSave, doctors, treatments }) => {
-    const [formData, setFormData] = useState({
-        medication: '',
-        presentation: '',
-        dosage: '',
-        recommendations: '',
-        relatedTreatment: '',
-        doctorId: doctors[0]?.id || ''
-    });
-    const [medicationSuggestions, setMedicationSuggestions] = useState<typeof COMMON_MEDICATIONS>([]);
+    const [medications, setMedications] = useState<Medication[]>([{ name: '', presentation: '', dosage: '' }]);
+    const [recommendations, setRecommendations] = useState('');
+    const [relatedTreatment, setRelatedTreatment] = useState('');
+    const [doctorId, setDoctorId] = useState(doctors[0]?.id || '');
+    const [medicationSuggestions, setMedicationSuggestions] = useState<Array<typeof COMMON_MEDICATIONS>[]>(() => [[]]);
 
-    const handleMedicationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setFormData(prev => ({ ...prev, medication: value, presentation: prev.medication !== value ? '' : prev.presentation, dosage: prev.medication !== value ? '' : prev.dosage }));
-        if (value) {
-            setMedicationSuggestions(
-                COMMON_MEDICATIONS.filter(med =>
-                    med.name.toLowerCase().includes(value.toLowerCase())
-                )
-            );
-        } else {
-            setMedicationSuggestions([]);
+    const handleAddMedication = () => {
+        setMedications(prev => [...prev, { name: '', presentation: '', dosage: '' }]);
+        setMedicationSuggestions(prev => [...prev, []]);
+    };
+
+    const handleRemoveMedication = (index: number) => {
+        if (medications.length > 1) {
+            setMedications(prev => prev.filter((_, i) => i !== index));
+            setMedicationSuggestions(prev => prev.filter((_, i) => i !== index));
         }
     };
 
-    const handleSuggestionClick = (med: typeof COMMON_MEDICATIONS[0]) => {
-        setFormData(prev => ({
-            ...prev,
-            medication: med.name,
+    const handleMedicationFieldChange = (index: number, field: keyof Medication, value: string) => {
+        const newMedications = [...medications];
+        newMedications[index] = { ...newMedications[index], [field]: value };
+        
+        setMedications(newMedications);
+
+        if (field === 'name' && value) {
+            const newSuggestions = [...medicationSuggestions];
+            newSuggestions[index] = COMMON_MEDICATIONS.filter(med =>
+                med.name.toLowerCase().includes(value.toLowerCase())
+            );
+            setMedicationSuggestions(newSuggestions);
+        } else if (field === 'name') {
+            const newSuggestions = [...medicationSuggestions];
+            newSuggestions[index] = [];
+            setMedicationSuggestions(newSuggestions);
+        }
+    };
+
+    const handleSuggestionClick = (medIndex: number, med: typeof COMMON_MEDICATIONS[0]) => {
+        const newMedications = [...medications];
+        newMedications[medIndex] = {
+            name: med.name,
             presentation: med.presentation,
             dosage: med.dosage
-        }));
-        setMedicationSuggestions([]);
+        };
+        setMedications(newMedications);
+
+        const newSuggestions = [...medicationSuggestions];
+        newSuggestions[medIndex] = [];
+        setMedicationSuggestions(newSuggestions);
     };
-    
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-    
+
     const addRecommendation = (rec: string) => {
-        setFormData(prev => ({
-            ...prev,
-            recommendations: prev.recommendations ? `${prev.recommendations}\n- ${rec}` : `- ${rec}`
-        }));
+        setRecommendations(prev => prev ? `${prev}\n- ${rec}` : `- ${rec}`);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.medication || !formData.dosage || !formData.doctorId) {
-            alert('Por favor, complete los campos de medicamento, dosis y doctor.');
+        const validMedications = medications.filter(m => m.name.trim() && m.dosage.trim());
+        if (validMedications.length === 0 || !doctorId) {
+            alert('Por favor, añada al menos un medicamento completo y seleccione un doctor.');
             return;
         }
-        onSave(formData);
+        onSave({ medications: validMedications, recommendations, relatedTreatment, doctorId });
         onClose();
     };
 
@@ -79,43 +90,61 @@ const PrescriptionModal: React.FC<PrescriptionModalProps> = ({ onClose, onSave, 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="doctorId" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Doctor que prescribe</label>
-                            <select name="doctorId" id="doctorId" value={formData.doctorId} onChange={handleChange} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <select name="doctorId" id="doctorId" value={doctorId} onChange={e => setDoctorId(e.target.value)} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                 {doctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                             </select>
                         </div>
                         <div>
                             <label htmlFor="relatedTreatment" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tratamiento Asociado (Opcional)</label>
-                            <select name="relatedTreatment" id="relatedTreatment" value={formData.relatedTreatment} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <select name="relatedTreatment" id="relatedTreatment" value={relatedTreatment} onChange={e => setRelatedTreatment(e.target.value)} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                 <option value="">Ninguno</option>
                                 {treatments.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
                     </div>
-                    <div className="relative">
-                        <label htmlFor="medication" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Medicamento (Rp/)</label>
-                        <input type="text" id="medication" name="medication" value={formData.medication} onChange={handleMedicationChange} required autoComplete="off" className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                        {medicationSuggestions.length > 0 && (
-                            <ul className="absolute z-10 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-40 overflow-y-auto">
-                                {medicationSuggestions.map(med => (
-                                    <li key={med.name} onClick={() => handleSuggestionClick(med)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer">{med.name}</li>
-                                ))}
-                            </ul>
-                        )}
+
+                    <div className="space-y-4">
+                        {medications.map((med, index) => (
+                            <div key={index} className="relative p-4 border border-slate-300 dark:border-slate-600 rounded-lg space-y-4 bg-slate-50 dark:bg-slate-700/30">
+                                {medications.length > 1 && (
+                                    <button type="button" onClick={() => handleRemoveMedication(index)} className="absolute top-2 right-2 p-1 text-red-500 hover:bg-red-100 dark:hover:bg-slate-600 rounded-full">
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                )}
+                                <div className="relative">
+                                    <label htmlFor={`medication-${index}`} className="block text-sm font-medium text-slate-700 dark:text-slate-300">Medicamento (Rp/)</label>
+                                    <input type="text" id={`medication-${index}`} name="name" value={med.name} onChange={e => handleMedicationFieldChange(index, 'name', e.target.value)} required autoComplete="off" className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                                    {medicationSuggestions[index]?.length > 0 && (
+                                        <ul className="absolute z-10 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-40 overflow-y-auto">
+                                            {medicationSuggestions[index].map(medSuggestion => (
+                                                <li key={medSuggestion.name} onClick={() => handleSuggestionClick(index, medSuggestion)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer">{medSuggestion.name}</li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor={`presentation-${index}`} className="block text-sm font-medium text-slate-700 dark:text-slate-300">Presentación</label>
+                                        <input type="text" id={`presentation-${index}`} name="presentation" value={med.presentation} onChange={e => handleMedicationFieldChange(index, 'presentation', e.target.value)} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor={`dosage-${index}`} className="block text-sm font-medium text-slate-700 dark:text-slate-300">Indicaciones / Dosis</label>
+                                        <input type="text" id={`dosage-${index}`} name="dosage" value={med.dosage} onChange={e => handleMedicationFieldChange(index, 'dosage', e.target.value)} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="presentation" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Presentación</label>
-                            <input type="text" id="presentation" name="presentation" value={formData.presentation} onChange={handleChange} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                        </div>
-                         <div>
-                            <label htmlFor="dosage" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Indicaciones / Dosis</label>
-                            <input type="text" id="dosage" name="dosage" value={formData.dosage} onChange={handleChange} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                        </div>
-                    </div>
-                     <div>
+                    
+                    <button type="button" onClick={handleAddMedication} className="w-full flex items-center justify-center space-x-2 border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 font-semibold py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50">
+                        <PlusIcon className="w-5 h-5"/>
+                        <span>Añadir Medicamento</span>
+                    </button>
+
+                    <div>
                         <label htmlFor="recommendations" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Recomendaciones Adicionales</label>
-                        <textarea id="recommendations" name="recommendations" value={formData.recommendations} onChange={handleChange} rows={4} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                         <div className="flex flex-wrap gap-2 mt-2">
+                        <textarea id="recommendations" name="recommendations" value={recommendations} onChange={e => setRecommendations(e.target.value)} rows={4} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                        <div className="flex flex-wrap gap-2 mt-2">
                             {COMMON_RECOMMENDATIONS.map(rec => (
                                 <button key={rec} type="button" onClick={() => addRecommendation(rec)} className="px-2 py-1 text-xs bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-full hover:bg-slate-300 dark:hover:bg-slate-500">+ {rec}</button>
                             ))}
@@ -137,60 +166,73 @@ const PrescriptionToPrint = React.forwardRef<HTMLDivElement, { prescription: Pre
     return (
         <div ref={ref} className="bg-white h-full flex flex-col font-sans text-slate-900">
             {/* Header */}
-            <header className="bg-blue-600 text-white p-6 flex justify-between items-center">
+            <header className="bg-blue-600 text-white p-4 flex justify-between items-start">
                 <div className="flex items-center space-x-3">
                     <DentalIcon className="w-12 h-12" />
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">{clinicName} Dental</h1>
-                        <p className="text-sm text-blue-200">Salud y Estética Dental</p>
+                        <h1 className="text-3xl font-extrabold tracking-tight">{clinicName} Dental</h1>
+                        <p className="text-sm text-blue-200">Salud y Estética Dental de Confianza</p>
                     </div>
                 </div>
-                <div className="text-right text-sm">
-                    <p className="font-bold text-lg">{doctor?.name}</p>
+                <div className="text-right text-xs flex-shrink-0">
+                    <p className="font-bold text-base">{doctor?.name}</p>
                     <p>{doctor?.specialty}</p>
-                    <p>{doctor?.licenseNumber}</p>
+                    <p className="font-mono">{doctor?.licenseNumber}</p>
                 </div>
             </header>
 
             {/* Patient Info */}
-            <section className="p-6 bg-slate-50 border-b border-slate-200">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+            <section className="p-4 bg-slate-50 border-b-2 border-slate-200">
+                <h2 className="text-lg font-bold text-slate-800 mb-3">Receta Médica</h2>
+                <div className="grid grid-cols-2 gap-4 text-xs">
                     <div>
                         <p className="text-slate-500 font-semibold uppercase tracking-wider">Paciente</p>
-                        <p className="font-bold text-slate-800 text-base">{patientName}</p>
+                        <p className="font-bold text-slate-800 text-sm">{patientName}</p>
                     </div>
                     <div className="text-right">
                         <p className="text-slate-500 font-semibold uppercase tracking-wider">Fecha de Emisión</p>
-                        <p className="font-bold text-slate-800 text-base">{new Date(prescription.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        <p className="font-bold text-slate-800 text-sm">{new Date(prescription.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                     </div>
                 </div>
                 {prescription.relatedTreatment && (
-                    <div className="mt-4">
-                        <p className="text-slate-500 font-semibold text-sm uppercase tracking-wider">Tratamiento Asociado</p>
-                        <p className="font-medium text-slate-800">{prescription.relatedTreatment}</p>
+                    <div className="mt-3">
+                        <p className="text-slate-500 font-semibold text-xs uppercase tracking-wider">Tratamiento Asociado</p>
+                        <p className="font-medium text-slate-800 text-sm">{prescription.relatedTreatment}</p>
                     </div>
                 )}
             </section>
             
             {/* Body */}
-            <main className="flex-1 p-6 space-y-8 text-base">
+            <main className="flex-1 p-4 space-y-4 text-xs">
                 <div>
-                    <h2 className="text-blue-600 font-bold text-2xl mb-2">Rp/</h2>
-                    <div className="pl-4 border-l-4 border-blue-200">
-                        <p className="font-bold text-lg">{prescription.medication}</p>
-                        <p className="text-slate-600">{prescription.presentation}</p>
-                    </div>
-                </div>
-
-                <div>
-                    <h3 className="font-bold text-slate-800 border-b-2 border-slate-200 pb-1 mb-3 uppercase tracking-wider">Indicaciones</h3>
-                    <p className="pl-4 text-slate-700 whitespace-pre-wrap">{prescription.dosage}</p>
+                    <h2 className="text-pink-600 font-bold text-xl mb-2">Rp/</h2>
+                    <table className="w-full text-left">
+                        <thead className="border-b-2 border-slate-300">
+                            <tr className="text-slate-600 uppercase tracking-wider text-[10px]">
+                                <th className="pb-1 font-semibold w-2/5">Producto / Presentación</th>
+                                <th className="pb-1 font-semibold">Indicaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {prescription.medications.map((med, index) => (
+                                <tr key={index} className="border-b border-slate-200 align-top">
+                                    <td className="py-1.5 pr-2">
+                                        <p className="font-bold text-slate-800 text-sm">{index + 1}. {med.name}</p>
+                                        <p className="text-slate-500">{med.presentation}</p>
+                                    </td>
+                                    <td className="py-1.5">
+                                        <p className="text-slate-700 whitespace-pre-wrap">{med.dosage}</p>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
                 
                 {recommendationsList.length > 0 && (
                     <div>
-                        <h3 className="font-bold text-slate-800 border-b-2 border-slate-200 pb-1 mb-3 uppercase tracking-wider">Recomendaciones</h3>
-                        <ul className="pl-8 list-disc space-y-1 text-slate-700">
+                        <h3 className="font-bold text-slate-800 border-b-2 border-slate-200 pb-1 mb-2 uppercase tracking-wider text-[10px]">Recomendaciones</h3>
+                        <ul className="pl-4 list-disc space-y-1 text-slate-700">
                             {recommendationsList.map((rec, index) => (
                                 <li key={index}>{rec}</li>
                             ))}
@@ -200,10 +242,10 @@ const PrescriptionToPrint = React.forwardRef<HTMLDivElement, { prescription: Pre
             </main>
 
             {/* Footer */}
-            <footer className="p-6 mt-auto text-center">
-                <div className="border-t-2 border-slate-300 w-72 mx-auto pt-2">
-                    <p className="font-semibold">{doctor?.name}</p>
-                    <p className="text-sm text-slate-500">Firma y Sello del Profesional</p>
+            <footer className="px-8 py-6 mt-auto text-center">
+                <div className="border-t-2 border-slate-400 w-64 mx-auto pt-3">
+                    <p className="font-semibold text-base">{doctor?.name}</p>
+                    <p className="text-xs text-slate-500">Firma y Sello del Profesional</p>
                 </div>
             </footer>
         </div>
@@ -300,6 +342,7 @@ export const Prescriptions: React.FC<PrescriptionsProps> = ({ prescriptions, onU
                 <div className="space-y-4">
                     {prescriptions.map(p => {
                         const doctor = doctorsMap[p.doctorId];
+                        const firstMedication = p.medications[0];
                         return (
                         <div key={p.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 transition-shadow hover:shadow-lg">
                             <div className="flex justify-between items-start">
@@ -308,8 +351,12 @@ export const Prescriptions: React.FC<PrescriptionsProps> = ({ prescriptions, onU
                                         <FileTextIcon className="w-6 h-6"/>
                                     </div>
                                     <div>
-                                        <p className="font-bold text-lg text-blue-600 dark:text-blue-400">{p.medication}</p>
-                                        <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">{p.presentation}</p>
+                                        {firstMedication && (
+                                            <p className="font-bold text-lg text-blue-600 dark:text-blue-400">
+                                                {firstMedication.name}
+                                                {p.medications.length > 1 && <span className="text-sm font-normal text-gray-500"> (+{p.medications.length - 1})</span>}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -319,14 +366,16 @@ export const Prescriptions: React.FC<PrescriptionsProps> = ({ prescriptions, onU
                                      </button>
                                 </div>
                             </div>
-                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
-                                 <div>
-                                    <p className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 mb-1">Indicaciones</p>
-                                    <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{p.dosage}</p>
-                                 </div>
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                                 {p.medications.map((med, index) => (
+                                     <div key={index}>
+                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{index+1}. {med.name} <span className="font-normal text-gray-500 dark:text-gray-400">({med.presentation})</span></p>
+                                        <p className="text-xs text-gray-600 dark:text-gray-300 pl-4"> &rarr; {med.dosage}</p>
+                                     </div>
+                                 ))}
                                  {p.recommendations && (
                                      <div>
-                                        <p className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 mb-1">Recomendaciones</p>
+                                        <p className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 mt-2">Recomendaciones</p>
                                         <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{p.recommendations}</p>
                                     </div>
                                  )}

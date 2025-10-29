@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { Session, Payment } from '../types';
 import { TREATMENTS_MAP } from '../constants';
