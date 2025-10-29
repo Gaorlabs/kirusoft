@@ -1,6 +1,5 @@
 
 
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 // FIX: Added 'ToothState' to imports for type safety in data transformations.
@@ -331,7 +330,7 @@ const AdminBudgetsView: React.FC<Omit<AdminPageProps, 'onLogout' | 'setSettings'
                                 <span className="font-semibold text-right">S/ {budget.total.toFixed(2)}</span>
                                 <span>{budget.followUpDate ? `Seguimiento: ${new Date(budget.followUpDate).toLocaleDateString()}` : 'Sin seguimiento'}</span>
                             </div>
-                            <ChevronDownIcon className={`ml-4 transition-transform ${expandedBudgetId === budget.id ? 'rotate-180' : ''}`} />
+                            <ChevronDownIcon className={`w-5 h-5 ml-4 text-slate-500 transition-transform ${expandedBudgetId === budget.id ? 'rotate-180' : ''}`} />
                         </div>
                         {expandedBudgetId === budget.id && (
                             <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
