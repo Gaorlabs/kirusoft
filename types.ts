@@ -6,7 +6,7 @@ export type TreatmentStatus = 'proposed' | 'completed';
 export type TreatmentApplication = 'surface' | 'whole_tooth' | 'root';
 
 // FIX: Added new treatment IDs to the type definitions to resolve type errors in `constants.tsx`.
-export type ToothCondition = 'caries' | 'filling' | 'endodontics' | 'crown' | 'implant' | 'sealant' | 'pulpotomy' | 'post-and-core';
+export type ToothCondition = 'caries' | 'filling' | 'endodontics' | 'crown' | 'implant' | 'sealant' | 'pulpotomy' | 'post-and-core' | 'fractura' | 'remanente-radicular' | 'restauracion-temporal' | 'corona-temporal';
 export type WholeToothCondition = 'extraction' | 'missing' | 'unerupted' | 'removable-prosthesis';
 
 export interface DentalTreatment {
@@ -71,6 +71,7 @@ export interface Doctor {
     id: string;
     name: string;
     specialty: string;
+    licenseNumber?: string;
     availability?: Record<string, string[]>;
 }
 
@@ -98,8 +99,11 @@ export interface Prescription {
     id: string;
     date: string;
     medication: string;
+    presentation: string;
     dosage: string;
-    instructions: string;
+    recommendations: string;
+    relatedTreatment?: string;
+    doctorId: string;
 }
 
 export interface ConsentForm {

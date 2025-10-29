@@ -21,6 +21,7 @@ export const ToothPlaceholderIcon: React.FC<React.SVGProps<SVGSVGElement>> = (pr
 export const RemovableProsthesisIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => <Icon {...props}><path d="M20.5 14a2.5 2.5 0 0 1-2.5 2.5H6a2.5 2.5 0 0 1-2.5-2.5V12h17v2zM6 12V9a2 2 0 0 1 2-2h1m5 0h1a2 2 0 0 1 2 2v3"/></Icon>;
 export const PulpotomyIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => <Icon {...props}><path d="M12 20.9l-4.95-4.95a7 7 0 1 1 9.9 0L12 20.9z" /><path d="M12 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" /><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /></Icon>;
 export const PostAndCoreIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => <Icon {...props}><path d="M12 20.9l-4.95-4.95a7 7 0 1 1 9.9 0L12 20.9z" /><path d="M12 14v-4m-2 0h4m-3 2h2" /></Icon>;
+export const FractureIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => <Icon {...props}><path d="M2 22l8-8m1-1 9-9" /><path d="M9.5 13.5l-3 3" /><path d="M14.5 8.5l-3 3" /></Icon>;
 export const ChevronDownIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => <Icon {...props}><polyline points="6 9 12 15 18 9"></polyline></Icon>;
 export const ChevronLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => <Icon {...props}><polyline points="15 18 9 12 15 6"></polyline></Icon>;
 export const ChevronRightIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => <Icon {...props}><polyline points="9 18 15 12 9 6"></polyline></Icon>;

@@ -76,6 +76,85 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ onClose, onSave, paymentToE
     );
 };
 
+interface AccountSummaryModalProps {
+    onClose: () => void;
+    onPrintA4: () => void;
+    sessions: Session[];
+    payments: Payment[];
+    patientName: string;
+    totalCost: number;
+    totalPaid: number;
+    balance: number;
+}
+
+const AccountSummaryModal: React.FC<AccountSummaryModalProps> = ({ onClose, onPrintA4, sessions, patientName, totalCost, totalPaid, balance }) => {
+    const allTreatments = useMemo(() => sessions.flatMap(s => s.treatments.map(t => ({ ...t, sessionName: s.name }))), [sessions]);
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm max-h-[90vh] flex flex-col">
+                <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Resumen de Cuenta</h2>
+                    <button onClick={onClose} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"><CloseIcon /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="bg-slate-50 dark:bg-slate-900 p-4 font-mono text-xs text-slate-800 dark:text-slate-200 w-[300px] mx-auto">
+                        <div className="text-center mb-4">
+                            <h3 className="font-bold text-lg">Kiru Dental</h3>
+                            <p>Av. Sonrisas 123, Lima</p>
+                            <p>{new Date().toLocaleString('es-ES')}</p>
+                        </div>
+                        <div className="border-t border-dashed border-slate-400 my-2"></div>
+                        <p><span className="font-semibold">Paciente:</span> {patientName}</p>
+                        <div className="border-t border-dashed border-slate-400 my-2"></div>
+
+                        {allTreatments.length > 0 && 
+                            allTreatments.map(t => {
+                                const info = TREATMENTS_MAP[t.treatmentId];
+                                return (
+                                    <div key={t.id} className="grid grid-cols-3 gap-1">
+                                        <span className="col-span-2 truncate">{info?.label} (D{t.toothId})</span>
+                                        <span className="text-right">S/{info?.price.toFixed(2)}</span>
+                                    </div>
+                                );
+                            })
+                        }
+                        
+                        <div className="border-t border-dashed border-slate-400 my-2"></div>
+
+                        <div className="space-y-1">
+                            <div className="flex justify-between font-semibold">
+                                <span>SUBTOTAL:</span>
+                                <span>S/{totalCost.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                                <span>PAGADO:</span>
+                                <span>S/{totalPaid.toFixed(2)}</span>
+                            </div>
+                            <div className="border-t-2 border-solid border-slate-400 my-2"></div>
+                            <div className="flex justify-between font-bold text-base">
+                                <span>SALDO:</span>
+                                <span>S/{balance.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className="text-center mt-4 pt-2 border-t border-dashed border-slate-400">
+                            <p>Gracias por su preferencia</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
+                    <button type="button" onClick={onClose} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 py-2 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold">Cerrar</button>
+                    <button type="button" onClick={onPrintA4} className="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 font-semibold flex items-center space-x-2"><PrintIcon className="w-4 h-4" /><span>Imprimir A4</span></button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 interface AccountsProps {
     sessions: Session[];
     patientId: string;
@@ -182,6 +261,7 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
     const printRef = useRef<HTMLDivElement>(null);
     const [editingPayment, setEditingPayment] = useState<Payment | null | {}>(null);
     const [itemToPrint, setItemToPrint] = useState<Payment | 'statement' | null>(null);
+    const [showSummaryModal, setShowSummaryModal] = useState(false);
 
     const totalCost = useMemo(() => sessions.flatMap(s => s.treatments).reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0), [sessions]);
     const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + p.amount, 0), [payments]);
@@ -228,7 +308,7 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
                 <h3 className="text-xl font-bold text-gray-900 dark:text-gray-200">Cuentas del Paciente</h3>
                 <div className="flex space-x-2">
                     <button onClick={() => setEditingPayment({})} className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"><PlusIcon /><span>Registrar Pago</span></button>
-                    <button onClick={() => setItemToPrint('statement')} className="flex items-center space-x-2 bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-lg"><PrintIcon /><span>Estado de Cuenta</span></button>
+                    <button onClick={() => setShowSummaryModal(true)} className="flex items-center space-x-2 bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-lg"><PrintIcon /><span>Estado de Cuenta</span></button>
                 </div>
             </div>
 
@@ -283,6 +363,22 @@ export const Accounts: React.FC<AccountsProps> = ({ sessions, patientId, payment
             </div>
 
             {editingPayment && <PaymentModal onClose={() => setEditingPayment(null)} onSave={handleSavePayment} paymentToEdit={'id' in editingPayment ? editingPayment : undefined} />}
+            
+            {showSummaryModal && (
+                <AccountSummaryModal
+                    onClose={() => setShowSummaryModal(false)}
+                    onPrintA4={() => {
+                        setItemToPrint('statement');
+                        setShowSummaryModal(false);
+                    }}
+                    sessions={sessions}
+                    payments={payments}
+                    patientName={patientName}
+                    totalCost={totalCost}
+                    totalPaid={totalPaid}
+                    balance={balance}
+                />
+            )}
 
             <div className="hidden">
                  {itemToPrint === 'statement' && <AccountStatementToPrint ref={printRef} sessions={sessions} clinicName="Kiru" payments={payments} patientName={patientName} />}

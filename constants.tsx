@@ -2,16 +2,20 @@
 
 import React from 'react';
 import type { DentalTreatment, AppointmentStatus } from './types';
-import { CariesIcon, CrownIcon, EndodonticsIcon, FillingIcon, HealthyIcon, ImplantIcon, MissingIcon, UneruptedIcon, ExtractionIcon, PreventionIcon, RemovableProsthesisIcon, PulpotomyIcon, PostAndCoreIcon } from './components/icons';
+import { CariesIcon, CrownIcon, EndodonticsIcon, FillingIcon, HealthyIcon, ImplantIcon, MissingIcon, UneruptedIcon, ExtractionIcon, PreventionIcon, RemovableProsthesisIcon, PulpotomyIcon, PostAndCoreIcon, FractureIcon } from './components/icons';
 
 export const DENTAL_TREATMENTS: DentalTreatment[] = [
     { id: 'caries', label: 'Caries', category: 'Patología', price: 80, appliesTo: 'surface', icon: <CariesIcon /> },
+    { id: 'fractura', label: 'Fractura', category: 'Patología', price: 0, appliesTo: 'surface', icon: <FractureIcon /> },
+    { id: 'remanente-radicular', label: 'Remanente Radicular', category: 'Patología', price: 0, appliesTo: 'root', icon: <ExtractionIcon /> },
+    { id: 'restauracion-temporal', label: 'Restauración Temporal', category: 'Patología', price: 50, appliesTo: 'surface', icon: <FillingIcon /> },
     { id: 'extraction', label: 'Extracción', category: 'Cirugía', price: 150, appliesTo: 'whole_tooth', icon: <ExtractionIcon /> },
     { id: 'filling', label: 'Obturación', category: 'Operatoria', price: 120, appliesTo: 'surface', icon: <FillingIcon /> },
     { id: 'sealant', label: 'Sellador', category: 'Operatoria', price: 60, appliesTo: 'surface', icon: <PreventionIcon /> },
     { id: 'endodontics', label: 'Endodoncia', category: 'Endodoncia', price: 450, appliesTo: 'root', icon: <EndodonticsIcon /> },
     { id: 'pulpotomy', label: 'Pulpotomía', category: 'Endodoncia', price: 250, appliesTo: 'root', icon: <PulpotomyIcon /> },
     { id: 'crown', label: 'Corona', category: 'Rehabilitación', price: 1000, appliesTo: 'surface', icon: <CrownIcon /> },
+    { id: 'corona-temporal', label: 'Corona Temporal', category: 'Patología', price: 200, appliesTo: 'surface', icon: <CrownIcon /> },
     { id: 'implant', label: 'Implante', category: 'Rehabilitación', price: 3000, appliesTo: 'root', icon: <ImplantIcon /> },
     { id: 'post-and-core', label: 'Perno y Muñón', category: 'Rehabilitación', price: 300, appliesTo: 'root', icon: <PostAndCoreIcon /> },
     { id: 'removable-prosthesis', label: 'Prótesis Removible', category: 'Rehabilitación', price: 1200, appliesTo: 'whole_tooth', icon: <RemovableProsthesisIcon /> },
@@ -107,4 +111,19 @@ export const CONSENT_TEMPLATES = [
         id: 'cosmetic',
         title: 'Consentimiento para Procedimiento Cosmético',
     },
+];
+
+export const COMMON_MEDICATIONS = [
+    { name: 'Amoxicilina', presentation: '500mg Cápsulas', dosage: 'Tomar 1 cápsula cada 8 horas por 7 días.' },
+    { name: 'Ibuprofeno', presentation: '400mg Tabletas', dosage: 'Tomar 1 tableta cada 6 horas si hay dolor.' },
+    { name: 'Paracetamol', presentation: '500mg Tabletas', dosage: 'Tomar 1 tableta cada 8 horas para fiebre o dolor.' },
+    { name: 'Clorhexidina enjuague bucal', presentation: '0.12% Solución', dosage: 'Realizar enjuagues con 15ml por 30 segundos, 2 veces al día.' },
+];
+
+export const COMMON_RECOMMENDATIONS = [
+    'No escupir ni enjuagarse las primeras 24 horas.',
+    'Aplicar hielo en la zona por 15 minutos.',
+    'Dieta blanda y fría las primeras 24 horas.',
+    'No consumir alcohol ni fumar.',
+    'Mantener una buena higiene bucal con cepillado suave en la zona.',
 ];

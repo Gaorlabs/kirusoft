@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
@@ -16,16 +17,16 @@ const createInitialOdontogram = (teeth: number[]): OdontogramState => teeth.redu
 
 // Mock data for initial state
 const MOCK_DOCTORS: Doctor[] = [
-    { id: 'doc1', name: 'Dr. Ana García', specialty: 'Ortodoncia', availability: {
+    { id: 'doc1', name: 'Dr. Ana García', specialty: 'Ortodoncia', licenseNumber: 'COP 12345', availability: {
         'Monday': ['09:00', '10:00', '11:00', '14:00', '15:00'],
         'Wednesday': ['09:00', '10:00', '11:00', '12:00'],
         'Friday': ['09:00', '10:00', '14:00', '15:00', '16:00'],
     } },
-    { id: 'doc2', name: 'Dr. Carlos Martinez', specialty: 'Endodoncia', availability: {
+    { id: 'doc2', name: 'Dr. Carlos Martinez', specialty: 'Endodoncia', licenseNumber: 'COP 67890', availability: {
         'Tuesday': ['10:00', '11:00', '12:00', '15:00', '16:00', '17:00'],
         'Thursday': ['09:00', '10:00', '11:00', '14:00'],
     } },
-    { id: 'doc3', name: 'Dr. Sofia Rodriguez', specialty: 'Cirugía Bucal', availability: {
+    { id: 'doc3', name: 'Dr. Sofia Rodriguez', specialty: 'Cirugía Bucal', licenseNumber: 'COP 11223', availability: {
         'Monday': ['15:00', '16:00', '17:00'],
         'Tuesday': ['09:00', '10:00'],
         'Wednesday': ['15:00', '16:00', '17:00'],
@@ -418,6 +419,7 @@ function App() {
                 onSavePayment={handleSavePayment}
                 onDeletePayment={handleDeletePayment}
                 initialTab={initialTabForConsultation}
+                doctors={doctors}
             />
         );
     } else if (page === 'consultation' && isAuthenticated && currentPatientIndex !== null && !currentPatientRecord) {

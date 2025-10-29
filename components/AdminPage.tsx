@@ -1,15 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Appointment, Doctor, Promotion, AppSettings, AppointmentStatus, PatientRecord, Payment, AppliedTreatment } from '../types';
 import { APPOINTMENT_STATUS_CONFIG, KANBAN_COLUMNS, DENTAL_SERVICES_MAP, TREATMENTS_MAP } from '../constants';
@@ -108,8 +96,7 @@ const AdminAccountsView: React.FC<{
             if (summary) {
                 // FIX: Explicitly typing the accumulator and item parameters in `reduce` prevents type inference issues that can lead to arithmetic errors, especially when amounts might be strings from localStorage.
                 const billed = (record.sessions || []).flatMap(s => s.treatments).reduce((sum: number, t: AppliedTreatment) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
-                // FIX: Explicitly type `p` as `Payment` to ensure `p.amount` is treated as a number, preventing arithmetic errors.
-                // Added `|| 0` to handle cases where amount might be NaN or not a valid number.
+                // FIX: Explicitly type `p` as `Payment` and convert `p.amount` to a number to prevent arithmetic errors from string concatenation, which can occur with data from localStorage.
                 const paid = (record.payments || []).reduce((sum: number, p: Payment) => sum + (Number(p.amount) || 0), 0);
                 
                 summary.totalBilled = billed;
@@ -180,18 +167,16 @@ const AdminDashboardView: React.FC<{
         let proposedValue = 0;
         let revenue = 0;
         
-        Object.keys(patientRecords).forEach(patientId => {
-            const record = patientRecords[patientId];
+        // FIX: Switched to Object.values to get properly typed records, fixing an 'unknown' type error on 'record'.
+        Object.values(patientRecords).forEach(record => {
+            // FIX: Explicitly typed `sum` and `t` in the `reduce` function to resolve a potential type inference issue that could cause an arithmetic error.
             proposedValue += (record.sessions || [])
                 .flatMap(s => s.treatments)
                 .filter(t => t.status === 'proposed')
-                .reduce((sum, t) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
+                .reduce((sum: number, t: AppliedTreatment) => sum + (TREATMENTS_MAP[t.treatmentId]?.price || 0), 0);
 
-            // FIX: Explicitly type `payment` as `Payment` to ensure `payment.amount` is treated as a number, preventing arithmetic errors.
-            // Added `|| 0` to handle cases where amount might be NaN or not a valid number.
-            (record.payments || []).forEach((payment: Payment) => {
-                revenue += (Number(payment.amount) || 0);
-            });
+            // FIX: Replaced `forEach` with `reduce` to prevent potential type inference issues with the `+=` operator. This ensures the sum is correctly calculated as a number, resolving the arithmetic error.
+            revenue += (record.payments || []).reduce((sum: number, payment: Payment) => sum + (Number(payment.amount) || 0), 0);
         });
 
         return {
@@ -209,19 +194,22 @@ const AdminDashboardView: React.FC<{
             return d.toDateString();
         }).reverse();
 
-        const dailyTotals: Record<string, number> = last7Days.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
+        const initialDailyTotals: Record<string, number> = last7Days.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
 
-        Object.keys(patientRecords).forEach(patientId => {
-            const record = patientRecords[patientId];
-            // FIX: Explicitly type `payment` to ensure `payment.amount` is treated as a number. This resolves a type inference issue that could lead to arithmetic errors.
-            // Added `|| 0` to handle cases where amount might be NaN or not a valid number.
-            (record.payments || []).forEach((payment: Payment) => {
+        // FIX: Refactored to use `reduce` for calculating daily totals. This functional approach is more robust, consistent with other calculations in the component, and resolves the arithmetic error by avoiding mutation inside a loop.
+        const dailyTotals = Object.values(patientRecords)
+            .flatMap(record => record.payments || [])
+            .reduce((totals, payment) => {
                 const paymentDay = new Date(payment.date).toDateString();
-                if (dailyTotals[paymentDay] !== undefined) {
-                    dailyTotals[paymentDay] += (Number(payment.amount) || 0);
+                if (Object.prototype.hasOwnProperty.call(totals, paymentDay)) {
+                    // FIX: Replaced mutating reduce with an immutable update to resolve arithmetic error and follow functional best practices.
+                    return {
+                        ...totals,
+                        [paymentDay]: totals[paymentDay] + (Number(payment.amount) || 0),
+                    };
                 }
-            });
-        });
+                return totals;
+            }, initialDailyTotals);
         
         return last7Days.map(day => ({
             day: new Date(day).toLocaleDateString('es-ES', { weekday: 'short' }),
@@ -325,6 +313,70 @@ const AdminDashboardView: React.FC<{
     );
 };
 
+const PatientDetailsView: React.FC<{
+    patient: Appointment;
+    appointments: Appointment[];
+    onEdit: () => void;
+    onOpenClinicalRecord: (appointment: Appointment) => void;
+}> = ({ patient, appointments, onEdit, onOpenClinicalRecord }) => {
+    
+    const patientAppointments = useMemo(() => {
+        return appointments
+            .filter(app => app.email === patient.email)
+            .sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+    }, [appointments, patient.email]);
+
+    return (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md h-full p-6 flex flex-col">
+            <div className="flex justify-between items-start">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{patient.name}</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Mostrando datos de la cita más reciente.</p>
+                </div>
+                <div className="flex space-x-2 flex-shrink-0">
+                    <button onClick={onEdit} className="flex items-center space-x-2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-transform hover:scale-105">
+                        <PencilIcon className="w-5 h-5"/>
+                        <span>Editar</span>
+                    </button>
+                    <button onClick={() => onOpenClinicalRecord(patient)} className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-transform hover:scale-105">
+                        <BriefcaseIcon className="w-5 h-5"/>
+                        <span>Ficha Clínica</span>
+                    </button>
+                </div>
+            </div>
+            <div className="border-t border-slate-200 dark:border-slate-700 my-6"></div>
+            <div className="space-y-4 mb-6">
+                 <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Información de Contacto</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <p><span className="font-semibold text-slate-500 dark:text-slate-400">Teléfono:</span> {patient.phone}</p>
+                    <p><span className="font-semibold text-slate-500 dark:text-slate-400">Email:</span> {patient.email}</p>
+                 </div>
+            </div>
+            
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-4">Historial de Citas</h3>
+            <div className="flex-1 overflow-y-auto -mr-6 pr-6">
+                <ul className="space-y-3">
+                    {patientAppointments.length > 0 ? patientAppointments.map(app => (
+                        <li key={app.id} onClick={() => onOpenClinicalRecord(app)} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="font-semibold">{DENTAL_SERVICES_MAP[app.service]}</p>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(app.dateTime).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' })}</p>
+                                </div>
+                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${APPOINTMENT_STATUS_CONFIG[app.status].color} ${APPOINTMENT_STATUS_CONFIG[app.status].textColor}`}>
+                                    {APPOINTMENT_STATUS_CONFIG[app.status].title}
+                                </span>
+                            </div>
+                        </li>
+                    )) : (
+                         <li className="p-3 text-center text-slate-500 dark:text-slate-400">No hay citas registradas para este paciente.</li>
+                    )}
+                </ul>
+            </div>
+        </div>
+    );
+};
+
 
 export const AdminPage: React.FC<AdminPageProps> = (props) => {
     const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -339,7 +391,30 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
     const [draggedItem, setDraggedItem] = useState<Appointment | null>(null);
     const [dragOverStatus, setDragOverStatus] = useState<AppointmentStatus | null>(null);
     const [editingAvailabilityDoctor, setEditingAvailabilityDoctor] = useState<Doctor | null>(null);
+    const [selectedPatient, setSelectedPatient] = useState<Appointment | null>(null);
 
+    const patientMap = useMemo(() => props.appointments.reduce((acc, app) => {
+        // Use email as a unique patient identifier. Keep the most recent appointment for display.
+        if (!acc[app.email] || new Date(app.dateTime) > new Date(acc[app.email].dateTime)) {
+            acc[app.email] = app;
+        }
+        return acc;
+    }, {} as Record<string, Appointment>), [props.appointments]);
+
+    // FIX: Explicitly type the sort callback parameters `a` and `b` as `Appointment` to resolve the TypeScript error where they were being inferred as `unknown`.
+    const patients = useMemo(() => Object.values(patientMap).sort((a: Appointment, b: Appointment) => a.name.localeCompare(b.name)), [patientMap]);
+
+    useEffect(() => {
+        if (activeTab !== 'patients') {
+            setSelectedPatient(null);
+        }
+    }, [activeTab]);
+
+    useEffect(() => {
+        if (selectedPatient && !patients.find(p => p.email === selectedPatient.email)) {
+            setSelectedPatient(null);
+        }
+    }, [patients, selectedPatient]);
 
     useEffect(() => {
         const root = window.document.documentElement;
@@ -490,41 +565,42 @@ export const AdminPage: React.FC<AdminPageProps> = (props) => {
                     </div>
                 );
             case 'patients': {
-                 // FIX: Used Object.keys().map() to extract patient data, ensuring proper type inference for the 'patients' array where Object.values() was failing.
-                 const patientMap = props.appointments.reduce((acc, app) => {
-                    acc[app.email] = app;
-                    return acc;
-                 }, {} as Record<string, Appointment>);
-                 const patients = Object.keys(patientMap).map(key => patientMap[key]);
                 return (
-                    <div>
-                        <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Pacientes</h2>
-                        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-x-auto border border-slate-200 dark:border-slate-700">
-                            <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
-                                <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700">
-                                    <tr>
-                                        <th scope="col" className="px-6 py-3">Nombre</th>
-                                        <th scope="col" className="px-6 py-3">Teléfono</th>
-                                        <th scope="col" className="px-6 py-3">Email</th>
-                                        <th scope="col" className="px-6 py-3">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {patients.map(patient => (
-                                        <tr key={patient.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600/50">
-                                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{patient.name}</td>
-                                            <td className="px-6 py-4">{patient.phone}</td>
-                                            <td className="px-6 py-4">{patient.email}</td>
-                                            <td className="px-6 py-4">
-                                                <button onClick={() => props.onOpenClinicalRecord(patient)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center space-x-2" title="Abrir Ficha Clínica">
-                                                    <BriefcaseIcon className="w-5 h-5" />
-                                                    <span>Abrir Ficha Clínica</span>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                    <div className="flex h-full gap-6">
+                        <div className="w-1/3 flex flex-col">
+                            <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white flex-shrink-0">Pacientes ({patients.length})</h2>
+                            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 flex-1 overflow-y-auto">
+                                {patients.map(patient => (
+                                    <button 
+                                        key={patient.id}
+                                        onClick={() => setSelectedPatient(patient)}
+                                        className={`w-full text-left p-4 border-b border-slate-200 dark:border-slate-700 transition-colors ${selectedPatient?.email === patient.email ? 'bg-blue-100 dark:bg-blue-900/50' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                    >
+                                       <p className="font-semibold text-slate-900 dark:text-white">{patient.name}</p>
+                                       <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{patient.email}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="w-2/3">
+                            {selectedPatient ? (
+                                <PatientDetailsView 
+                                    patient={selectedPatient}
+                                    appointments={props.appointments}
+                                    onEdit={() => setEditingAppointment(selectedPatient)}
+                                    onOpenClinicalRecord={(app) => props.onOpenClinicalRecord(app)}
+                                />
+                            ) : (
+                                <div className="flex h-full items-center justify-center bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700">
+                                    <div className="text-center">
+                                        <div className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto mb-4">
+                                            <UsersIcon />
+                                        </div>
+                                        <p className="text-slate-500 dark:text-slate-400 font-semibold">Seleccione un paciente de la lista</p>
+                                        <p className="text-sm text-slate-400 dark:text-slate-500">Aquí se mostrarán sus detalles e historial de citas.</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 );

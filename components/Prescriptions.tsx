@@ -1,106 +1,280 @@
-import React, { useState, useRef } from 'react';
-import type { Prescription } from '../types';
-import { PlusIcon, FileTextIcon, CloseIcon, PrintIcon } from './icons';
+
+import React, { useState, useRef, useMemo } from 'react';
+import type { Prescription, Doctor } from '../types';
+import { PlusIcon, FileTextIcon, CloseIcon, PrintIcon, DentalIcon } from './icons';
+import { COMMON_MEDICATIONS, COMMON_RECOMMENDATIONS } from '../constants';
 
 interface PrescriptionModalProps {
     onClose: () => void;
     onSave: (prescription: Omit<Prescription, 'id' | 'date'>) => void;
+    doctors: Doctor[];
+    treatments: string[];
 }
 
-const PrescriptionModal: React.FC<PrescriptionModalProps> = ({ onClose, onSave }) => {
-    const [medication, setMedication] = useState('');
-    const [dosage, setDosage] = useState('');
-    const [instructions, setInstructions] = useState('');
+const PrescriptionModal: React.FC<PrescriptionModalProps> = ({ onClose, onSave, doctors, treatments }) => {
+    const [formData, setFormData] = useState({
+        medication: '',
+        presentation: '',
+        dosage: '',
+        recommendations: '',
+        relatedTreatment: '',
+        doctorId: doctors[0]?.id || ''
+    });
+    const [medicationSuggestions, setMedicationSuggestions] = useState<typeof COMMON_MEDICATIONS>([]);
+
+    const handleMedicationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setFormData(prev => ({ ...prev, medication: value, presentation: prev.medication !== value ? '' : prev.presentation, dosage: prev.medication !== value ? '' : prev.dosage }));
+        if (value) {
+            setMedicationSuggestions(
+                COMMON_MEDICATIONS.filter(med =>
+                    med.name.toLowerCase().includes(value.toLowerCase())
+                )
+            );
+        } else {
+            setMedicationSuggestions([]);
+        }
+    };
+
+    const handleSuggestionClick = (med: typeof COMMON_MEDICATIONS[0]) => {
+        setFormData(prev => ({
+            ...prev,
+            medication: med.name,
+            presentation: med.presentation,
+            dosage: med.dosage
+        }));
+        setMedicationSuggestions([]);
+    };
+    
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+    
+    const addRecommendation = (rec: string) => {
+        setFormData(prev => ({
+            ...prev,
+            recommendations: prev.recommendations ? `${prev.recommendations}\n- ${rec}` : `- ${rec}`
+        }));
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!medication || !dosage || !instructions) {
-            alert('Por favor, complete todos los campos.');
+        if (!formData.medication || !formData.dosage || !formData.doctorId) {
+            alert('Por favor, complete los campos de medicamento, dosis y doctor.');
             return;
         }
-        onSave({ medication, dosage, instructions });
+        onSave(formData);
         onClose();
     };
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Nueva Receta</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Nueva Receta Profesional</h2>
                     <button onClick={onClose} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"><CloseIcon /></button>
                 </div>
-                <form onSubmit={handleSubmit}>
-                    <div className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label htmlFor="medication" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Medicamento</label>
-                            <input type="text" id="medication" value={medication} onChange={e => setMedication(e.target.value)} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                            <label htmlFor="doctorId" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Doctor que prescribe</label>
+                            <select name="doctorId" id="doctorId" value={formData.doctorId} onChange={handleChange} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                {doctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
                         </div>
                         <div>
-                            <label htmlFor="dosage" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dosis</label>
-                            <input type="text" id="dosage" value={dosage} onChange={e => setDosage(e.target.value)} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
-                        </div>
-                        <div>
-                            <label htmlFor="instructions" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Instrucciones</label>
-                            <textarea id="instructions" value={instructions} onChange={e => setInstructions(e.target.value)} required rows={4} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-slate-900 dark:text-white" />
+                            <label htmlFor="relatedTreatment" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tratamiento Asociado (Opcional)</label>
+                            <select name="relatedTreatment" id="relatedTreatment" value={formData.relatedTreatment} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">Ninguno</option>
+                                {treatments.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
                         </div>
                     </div>
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
-                        <button type="button" onClick={onClose} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 py-2 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold">Cancelar</button>
-                        <button type="submit" className="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 font-semibold">Guardar Receta</button>
+                    <div className="relative">
+                        <label htmlFor="medication" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Medicamento (Rp/)</label>
+                        <input type="text" id="medication" name="medication" value={formData.medication} onChange={handleMedicationChange} required autoComplete="off" className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                        {medicationSuggestions.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-40 overflow-y-auto">
+                                {medicationSuggestions.map(med => (
+                                    <li key={med.name} onClick={() => handleSuggestionClick(med)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer">{med.name}</li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="presentation" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Presentación</label>
+                            <input type="text" id="presentation" name="presentation" value={formData.presentation} onChange={handleChange} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                        </div>
+                         <div>
+                            <label htmlFor="dosage" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Indicaciones / Dosis</label>
+                            <input type="text" id="dosage" name="dosage" value={formData.dosage} onChange={handleChange} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                        </div>
+                    </div>
+                     <div>
+                        <label htmlFor="recommendations" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Recomendaciones Adicionales</label>
+                        <textarea id="recommendations" name="recommendations" value={formData.recommendations} onChange={handleChange} rows={4} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                         <div className="flex flex-wrap gap-2 mt-2">
+                            {COMMON_RECOMMENDATIONS.map(rec => (
+                                <button key={rec} type="button" onClick={() => addRecommendation(rec)} className="px-2 py-1 text-xs bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-full hover:bg-slate-300 dark:hover:bg-slate-500">+ {rec}</button>
+                            ))}
+                        </div>
                     </div>
                 </form>
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
+                    <button type="button" onClick={onClose} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 py-2 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold">Cancelar</button>
+                    <button type="submit" onClick={handleSubmit} className="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 font-semibold">Guardar Receta</button>
+                </div>
             </div>
         </div>
     );
 };
 
+const PrescriptionToPrint = React.forwardRef<HTMLDivElement, { prescription: Prescription; clinicName: string; patientName: string; doctor?: Doctor }>(({ prescription, clinicName, patientName, doctor }, ref) => {
+    const recommendationsList = prescription.recommendations ? prescription.recommendations.split('\n').map(r => r.replace(/^- /, '')).filter(r => r) : [];
 
-const PrescriptionToPrint = React.forwardRef<HTMLDivElement, { prescription: Prescription, clinicName: string, patientName: string }>(({ prescription, clinicName, patientName }, ref) => {
     return (
-        <div ref={ref} className="p-8 font-sans text-gray-800">
-            <div className="flex justify-between items-start pb-4 border-b">
-                <div>
-                    <h1 className="text-3xl font-bold">{clinicName} Dental</h1>
-                    <p>Av. Sonrisas 123, Lima, Perú</p>
+        <div ref={ref} className="bg-white h-full flex flex-col font-sans text-slate-900">
+            {/* Header */}
+            <header className="bg-blue-600 text-white p-6 flex justify-between items-center">
+                <div className="flex items-center space-x-3">
+                    <DentalIcon className="w-12 h-12" />
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">{clinicName} Dental</h1>
+                        <p className="text-sm text-blue-200">Salud y Estética Dental</p>
+                    </div>
                 </div>
-                <div className="text-blue-500">
-                   <FileTextIcon className="w-16 h-16"/>
+                <div className="text-right text-sm">
+                    <p className="font-bold text-lg">{doctor?.name}</p>
+                    <p>{doctor?.specialty}</p>
+                    <p>{doctor?.licenseNumber}</p>
                 </div>
-            </div>
-            <div className="my-6">
-                <h2 className="text-2xl font-semibold mb-2">Receta Médica</h2>
-                <div className="grid grid-cols-2 gap-4">
-                    <p><span className="font-semibold">Fecha:</span> {new Date(prescription.date).toLocaleDateString()}</p>
-                    <p><span className="font-semibold">Paciente:</span> {patientName}</p>
-                </div>
-            </div>
+            </header>
 
-            <div className="mt-8 p-4 border rounded-lg">
-                <p className="font-bold text-xl text-blue-600">{prescription.medication}</p>
-                <p className="text-md font-semibold text-gray-600">{prescription.dosage}</p>
-                <div className="mt-4 pt-4 border-t">
-                    <p className="font-semibold mb-1">Instrucciones:</p>
-                    <p className="text-md text-gray-700 whitespace-pre-wrap">{prescription.instructions}</p>
+            {/* Patient Info */}
+            <section className="p-6 bg-slate-50 border-b border-slate-200">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p className="text-slate-500 font-semibold uppercase tracking-wider">Paciente</p>
+                        <p className="font-bold text-slate-800 text-base">{patientName}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-slate-500 font-semibold uppercase tracking-wider">Fecha de Emisión</p>
+                        <p className="font-bold text-slate-800 text-base">{new Date(prescription.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    </div>
                 </div>
-            </div>
-            <div className="mt-24 text-center">
-                <p className="border-t-2 w-1/2 mx-auto pt-2">Firma del Doctor</p>
-            </div>
+                {prescription.relatedTreatment && (
+                    <div className="mt-4">
+                        <p className="text-slate-500 font-semibold text-sm uppercase tracking-wider">Tratamiento Asociado</p>
+                        <p className="font-medium text-slate-800">{prescription.relatedTreatment}</p>
+                    </div>
+                )}
+            </section>
+            
+            {/* Body */}
+            <main className="flex-1 p-6 space-y-8 text-base">
+                <div>
+                    <h2 className="text-blue-600 font-bold text-2xl mb-2">Rp/</h2>
+                    <div className="pl-4 border-l-4 border-blue-200">
+                        <p className="font-bold text-lg">{prescription.medication}</p>
+                        <p className="text-slate-600">{prescription.presentation}</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 className="font-bold text-slate-800 border-b-2 border-slate-200 pb-1 mb-3 uppercase tracking-wider">Indicaciones</h3>
+                    <p className="pl-4 text-slate-700 whitespace-pre-wrap">{prescription.dosage}</p>
+                </div>
+                
+                {recommendationsList.length > 0 && (
+                    <div>
+                        <h3 className="font-bold text-slate-800 border-b-2 border-slate-200 pb-1 mb-3 uppercase tracking-wider">Recomendaciones</h3>
+                        <ul className="pl-8 list-disc space-y-1 text-slate-700">
+                            {recommendationsList.map((rec, index) => (
+                                <li key={index}>{rec}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </main>
+
+            {/* Footer */}
+            <footer className="p-6 mt-auto text-center">
+                <div className="border-t-2 border-slate-300 w-72 mx-auto pt-2">
+                    <p className="font-semibold">{doctor?.name}</p>
+                    <p className="text-sm text-slate-500">Firma y Sello del Profesional</p>
+                </div>
+            </footer>
         </div>
     );
 });
 
 
+const PrescriptionPreviewModal: React.FC<{
+    prescription: Prescription;
+    patientName: string;
+    onClose: () => void;
+    doctor?: Doctor;
+}> = ({ prescription, patientName, onClose, doctor }) => {
+    const printRef = useRef<HTMLDivElement>(null);
+
+    const handlePrint = () => {
+        const printContent = printRef.current;
+        if (printContent) {
+            const winPrint = window.open('', '', 'width=900,height=650');
+            if (winPrint) {
+                winPrint.document.write('<html><head><title>Receta</title>');
+                winPrint.document.write('<script src="https://cdn.tailwindcss.com"></script>');
+                winPrint.document.write('<style>@media print { @page { size: A5; margin: 0; } body { -webkit-print-color-adjust: exact; } }</style>');
+                winPrint.document.write('</head><body>');
+                winPrint.document.write(printContent.innerHTML);
+                winPrint.document.write('</body></html>');
+                winPrint.document.close();
+                winPrint.focus();
+                setTimeout(() => {
+                    winPrint.print();
+                    winPrint.close();
+                }, 500);
+            }
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Vista Previa de Receta (A5)</h2>
+                    <button onClick={onClose} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"><CloseIcon /></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 bg-slate-200 dark:bg-slate-900 flex justify-center">
+                    {/* A5 aspect ratio is 148mm x 210mm */}
+                    <div className="w-[148mm] h-[210mm] max-w-full scale-[0.4] sm:scale-50 md:scale-75 lg:scale-90 origin-top bg-white shadow-lg">
+                         <PrescriptionToPrint ref={printRef} prescription={prescription} clinicName="Kiru" patientName={patientName} doctor={doctor} />
+                    </div>
+                </div>
+                 <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
+                    <button type="button" onClick={onClose} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 py-2 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold">Cancelar</button>
+                    <button type="button" onClick={handlePrint} className="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 font-semibold flex items-center space-x-2"><PrintIcon className="w-4 h-4"/><span>Imprimir</span></button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface PrescriptionsProps {
     prescriptions: Prescription[];
     onUpdate: (prescriptions: Prescription[]) => void;
     patientName: string;
+    doctors: Doctor[];
+    treatments: string[];
 }
 
-export const Prescriptions: React.FC<PrescriptionsProps> = ({ prescriptions, onUpdate, patientName }) => {
+export const Prescriptions: React.FC<PrescriptionsProps> = ({ prescriptions, onUpdate, patientName, doctors, treatments }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [prescriptionToPrint, setPrescriptionToPrint] = useState<Prescription | null>(null);
-    const printRef = useRef<HTMLDivElement>(null);
+    const [prescriptionToPreview, setPrescriptionToPreview] = useState<Prescription | null>(null);
+
+    const doctorsMap = useMemo(() => doctors.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {} as Record<string, Doctor>), [doctors]);
 
     const handleSavePrescription = (data: Omit<Prescription, 'id' | 'date'>) => {
         const newPrescription: Prescription = {
@@ -109,30 +283,6 @@ export const Prescriptions: React.FC<PrescriptionsProps> = ({ prescriptions, onU
             date: new Date().toISOString(),
         };
         onUpdate([...prescriptions, newPrescription]);
-    };
-
-    const handlePrint = (prescription: Prescription) => {
-        setPrescriptionToPrint(prescription);
-        setTimeout(() => {
-            const printContent = printRef.current;
-            if (printContent) {
-                const winPrint = window.open('', '', 'width=900,height=650');
-                if (winPrint) {
-                    winPrint.document.write('<html><head><title>Receta</title>');
-                    winPrint.document.write('<script src="https://cdn.tailwindcss.com"></script>');
-                    winPrint.document.write('</head><body>');
-                    winPrint.document.write(printContent.innerHTML);
-                    winPrint.document.write('</body></html>');
-                    winPrint.document.close();
-                    winPrint.focus();
-                    setTimeout(() => {
-                        winPrint.print();
-                        winPrint.close();
-                        setPrescriptionToPrint(null);
-                    }, 500);
-                }
-            }
-        }, 100);
     };
 
     return (
@@ -148,7 +298,9 @@ export const Prescriptions: React.FC<PrescriptionsProps> = ({ prescriptions, onU
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {prescriptions.map(p => (
+                    {prescriptions.map(p => {
+                        const doctor = doctorsMap[p.doctorId];
+                        return (
                         <div key={p.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 transition-shadow hover:shadow-lg">
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center space-x-3">
@@ -157,29 +309,45 @@ export const Prescriptions: React.FC<PrescriptionsProps> = ({ prescriptions, onU
                                     </div>
                                     <div>
                                         <p className="font-bold text-lg text-blue-600 dark:text-blue-400">{p.medication}</p>
-                                        <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">{p.dosage}</p>
+                                        <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">{p.presentation}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
                                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{new Date(p.date).toLocaleDateString()}</p>
-                                     <button onClick={() => handlePrint(p)} className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors" title="Imprimir Receta">
+                                     <button onClick={() => setPrescriptionToPreview(p)} className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors" title="Imprimir Receta">
                                         <PrintIcon className="w-5 h-5"/>
                                      </button>
                                 </div>
                             </div>
-                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                 <p className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 mb-1">Instrucciones</p>
-                                 <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{p.instructions}</p>
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                                 <div>
+                                    <p className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 mb-1">Indicaciones</p>
+                                    <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{p.dosage}</p>
+                                 </div>
+                                 {p.recommendations && (
+                                     <div>
+                                        <p className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 mb-1">Recomendaciones</p>
+                                        <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{p.recommendations}</p>
+                                    </div>
+                                 )}
+                                 {doctor && (
+                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Prescrito por: <span className="font-semibold">{doctor.name}</span></p>
+                                 )}
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             )}
 
-            {isModalOpen && <PrescriptionModal onClose={() => setIsModalOpen(false)} onSave={handleSavePrescription} />}
-             <div className="hidden">
-                 {prescriptionToPrint && <PrescriptionToPrint ref={printRef} prescription={prescriptionToPrint} clinicName="Kiru" patientName={patientName}/>}
-            </div>
+            {isModalOpen && <PrescriptionModal onClose={() => setIsModalOpen(false)} onSave={handleSavePrescription} doctors={doctors} treatments={treatments}/>}
+            {prescriptionToPreview && (
+                <PrescriptionPreviewModal
+                    prescription={prescriptionToPreview}
+                    patientName={patientName}
+                    onClose={() => setPrescriptionToPreview(null)}
+                    doctor={doctorsMap[prescriptionToPreview.doctorId]}
+                />
+            )}
         </div>
     );
 };

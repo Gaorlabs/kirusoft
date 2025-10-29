@@ -1,10 +1,11 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Odontogram } from './Odontogram';
 import { Toolbar } from './Toolbar';
 import { TreatmentPlan } from './TreatmentPlan';
-import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment } from '../types';
-import { ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, DENTAL_TREATMENTS, QUADRANTS_PERMANENT, QUADRANTS_DECIDUOUS } from '../constants';
+import type { OdontogramState, ToothCondition, ToothSurfaceName, WholeToothCondition, ToothState, AppliedTreatment, Session, ClinicalFinding, Appointment, PatientRecord, Prescription, ConsentForm, Payment, Doctor } from '../types';
+import { ALL_TEETH_PERMANENT, ALL_TEETH_DECIDUOUS, DENTAL_TREATMENTS, QUADRANTS_PERMANENT, QUADRANTS_DECIDUOUS, TREATMENTS_MAP } from '../constants';
 import { DentalIcon, SaveIcon, MoonIcon, SunIcon, CalendarIcon, ArrowLeftIcon, OdontogramIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, FileTextIcon, ClipboardListIcon, DollarSignIcon, PlusIcon } from './icons';
 import { ClinicalFindings } from './ClinicalFindings';
 import { StatusBar } from './StatusBar';
@@ -29,10 +30,11 @@ interface ConsultationRoomProps {
     onSavePayment: (paymentData: { patientId: string; amount: number; method: string; date: string; id?: string }) => void;
     onDeletePayment: (paymentId: string, patientId: string) => void;
     initialTab?: MainView;
+    doctors: Doctor[];
 }
 
 
-export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToAdmin, onNavigateToPatient, isFirstPatient, isLastPatient, onSavePayment, onDeletePayment, initialTab }: ConsultationRoomProps) {
+export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToAdmin, onNavigateToPatient, isFirstPatient, isLastPatient, onSavePayment, onDeletePayment, initialTab, doctors }: ConsultationRoomProps) {
     const [record, setRecord] = useState(patientRecord);
     const [theme, setTheme] = useState<Theme>('dark');
     const [activeView, setActiveView] = useState<MainView>(initialTab || 'odontogram');
@@ -70,6 +72,16 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
         const deciduousFindings = Object.values(record.deciduousOdontogram).flatMap((tooth: ToothState) => tooth.findings);
         return [...permanentFindings, ...deciduousFindings];
     }, [record.permanentOdontogram, record.deciduousOdontogram]);
+
+    const allCompletedTreatments = useMemo(() => {
+        return record.sessions
+            .flatMap(session => session.treatments)
+            .filter(treatment => treatment.status === 'completed')
+            .map(treatment => {
+                const treatmentInfo = TREATMENTS_MAP[treatment.treatmentId];
+                return `${treatmentInfo.label} (Diente ${treatment.toothId})`;
+            });
+    }, [record.sessions]);
 
     const handleDeleteFinding = (findingId: string) => {
         setRecord(prev => {
@@ -375,6 +387,10 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
     const handleUpdateConsents = (consents: ConsentForm[]) => {
         setRecord(prev => ({ ...prev, consents }));
     };
+
+    const handleUpdateMedicalAlerts = (medicalAlerts: string[]) => {
+        setRecord(prev => ({ ...prev, medicalAlerts }));
+    };
     
     const quadrants = isPermanent ? QUADRANTS_PERMANENT : QUADRANTS_DECIDUOUS;
     
@@ -421,7 +437,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
             </header>
             <div className="flex flex-1 overflow-hidden">
                 <aside className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 overflow-y-auto">
-                    <PatientFile patient={patient} record={record} />
+                    <PatientFile patient={patient} record={record} onUpdateMedicalAlerts={handleUpdateMedicalAlerts} />
                 </aside>
                 
                 <main className="flex-1 flex flex-col p-4 overflow-hidden">
@@ -480,7 +496,7 @@ export function ConsultationRoom({ patient, patientRecord, onSave, onNavigateToA
                         )}
                          {activeView === 'plan' && <TreatmentPlan sessions={record.sessions} findings={allFindings} onSavePlan={handleSavePlan} onToggleTreatmentStatus={handleToggleTreatmentStatus}/>}
                          {activeView === 'history' && <ClinicalHistory sessions={record.sessions} onUpdateSession={handleUpdateSession} />}
-                         {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} />}
+                         {activeView === 'prescriptions' && <Prescriptions prescriptions={record.prescriptions} onUpdate={handleUpdatePrescriptions} patientName={patient.name} doctors={doctors} treatments={allCompletedTreatments} />}
                          {activeView === 'consents' && <Consents consents={record.consents} onUpdate={handleUpdateConsents} />}
                          {activeView === 'accounts' && <Accounts sessions={record.sessions} patientId={record.patientId} payments={record.payments} onSavePayment={onSavePayment} onDeletePayment={onDeletePayment} patientName={patient.name}/>}
                     </div>
